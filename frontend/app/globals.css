@@ -1,0 +1,253 @@
+/*
+ * globals.css — project-specific additions ONLY.
+ *
+ * The provided template styles are imported as-is and untouched in this order
+ * (see app/layout.tsx): bootstrap.min.css → common.css → main.css → responsive.css.
+ * This file loads LAST so anything here layers on top of the template without
+ * editing the original vendor files.
+ *
+ * Design-deviation styles (registration name fields, the public/private
+ * visibility selector, and the nested reply thread) live here and reuse the
+ * template's existing class conventions — see README "Design Deviations".
+ */
+
+/* Poppins is loaded via <link> in the layout head, matching the original template. */
+
+/* --- Small, shared helpers used by the React components --- */
+
+.app-error-text {
+  color: #ef4444;
+  font-size: 13px;
+  margin-top: 6px;
+  font-family: Poppins, sans-serif;
+}
+
+.app-field-error {
+  color: #ef4444;
+  font-size: 12px;
+  margin-top: 4px;
+  display: block;
+  font-family: Poppins, sans-serif;
+}
+
+.app-inline-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: app-spin 0.7s linear infinite;
+  vertical-align: middle;
+}
+
+@keyframes app-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+/* Text-style button used for inline actions (comment Like/Reply/Edit, counts). */
+.linklike {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: #65676b;
+  cursor: pointer;
+  font-weight: 500;
+}
+.linklike:hover {
+  color: #1890ff;
+  text-decoration: underline;
+}
+.linklike.liked {
+  color: #1890ff;
+}
+
+/* Post visibility label (author row) */
+.post-visibility {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #65676b;
+}
+.post-visibility svg {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* ---- Visibility selector (design deviation) ---- */
+.vis-selector {
+  display: inline-block;
+}
+.vis-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff;
+  border: 1px solid #e4e6eb;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+  cursor: pointer;
+}
+.vis-btn:hover {
+  background: #f5f7fa;
+}
+.vis-menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 150px;
+  background: #fff;
+  border: 1px solid #e4e6eb;
+  border-radius: 8px;
+  box-shadow: rgba(0, 0, 0, 0.12) 0px 6px 18px;
+  padding: 6px;
+  display: none;
+}
+.vis-menu.show {
+  display: block;
+}
+.vis-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: #333;
+  cursor: pointer;
+  text-align: left;
+}
+.vis-item:hover {
+  background: #f0f2f5;
+}
+.vis-item--active {
+  background: #e8f4ff;
+  color: #1890ff;
+}
+
+/* ---- Composer image preview ---- */
+.composer-preview {
+  position: relative;
+  margin: 12px 0;
+  max-width: 320px;
+}
+.composer-preview img {
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  display: block;
+}
+.composer-preview__remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* ---- Like avatar stack / who-liked ---- */
+.like-stack {
+  position: relative;
+  display: inline-block;
+}
+.like-stack__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: #65676b;
+  font-weight: 500;
+  font-size: 14px;
+}
+.like-stack__toggle:hover .like-stack__count {
+  text-decoration: underline;
+}
+.like-stack__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #1890ff;
+}
+.like-stack__badge svg {
+  filter: brightness(0) invert(1);
+}
+.like-stack__list {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 200px;
+  max-height: 260px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #e4e6eb;
+  border-radius: 8px;
+  box-shadow: rgba(0, 0, 0, 0.14) 0px 8px 24px;
+  padding: 8px;
+}
+.like-stack__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  font-size: 13px;
+  color: #333;
+}
+.like-stack__avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.like-stack__loading,
+.like-stack__more {
+  display: block;
+  font-size: 12px;
+  color: #8a8a8a;
+  padding: 4px;
+}
+
+/* Keep post images from being stretched by the global img rule. */
+._time_img {
+  width: 100%;
+  height: auto !important;
+  border-radius: 8px;
+  object-fit: cover;
+}
+._post_img,
+._txt_img,
+._comment_img,
+._comment_img1,
+._nav_profile_img,
+._nav_drop_img {
+  object-fit: cover;
+}
