@@ -1,0 +1,118 @@
+// Prisma schema — Appifylab social feed.
+// Postgres (Neon hosted / local Docker). Generates the JS client used ONLY by
+// the repository layer (services never import Prisma directly).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  // Neon: DATABASE_URL is the POOLED (pgbouncer) connection; DATABASE_URL is the
+  // unpooled connection used for migrations. Locally both point at the same DB.
+  directUrl = env("DATABASE_URL")
+}
+
+enum Visibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum LikeTargetType {
+  POST
+  COMMENT
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  firstName    String
+  lastName     String
+  email        String   @unique
+  passwordHash String
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  posts         Post[]
+  comments      Comment[]
+  likes         Like[]
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+// Postgres durability/audit backstop for refresh tokens.
+// Redis is the source of truth for hot-path validation; this table survives a
+// Redis flush and records rotation/revocation history for reuse detection.
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  jti       String    @unique // opaque id embedded in the token; maps row -> Redis key
+  userId    String    @db.Uuid
+  tokenHash String    @unique // sha256 of the full opaque token (never store the raw token)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model Post {
+  id            String     @id @default(uuid()) @db.Uuid
+  authorId      String     @db.Uuid
+  text          String
+  imageUrl      String?
+  visibility    Visibility @default(PUBLIC)
+  likesCount    Int        @default(0) // denormalized — never COUNT(*) on read
+  commentsCount Int        @default(0) // denormalized (counts top-level + replies)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  author   User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  comments Comment[]
+
+  // Matches the two real feed access patterns: public timeline (newest first)
+  // and "a user's own posts" (newest first).
+  @@index([visibility, createdAt(sort: Desc)])
+  @@index([authorId, createdAt(sort: Desc)])
+  @@map("posts")
+}
+
+model Comment {
+  id         String   @id @default(uuid()) @db.Uuid
+  postId     String   @db.Uuid
+  authorId   String   @db.Uuid
+  parentId   String?  @db.Uuid // non-null => this comment is a reply to another comment
+  text       String
+  likesCount Int      @default(0) // denormalized
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  post    Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author  User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies Comment[] @relation("CommentReplies")
+
+  @@index([postId, createdAt])
+  @@index([parentId])
+  @@map("comments")
+}
+
+model Like {
+  id         String         @id @default(uuid()) @db.Uuid
+  userId     String         @db.Uuid
+  targetType LikeTargetType
+  targetId   String         @db.Uuid
+  createdAt  DateTime       @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // DB-level guarantee of one like per user per target.
+  @@unique([userId, targetType, targetId])
+  // "who liked this target" lookups.
+  @@index([targetType, targetId, createdAt])
+  @@map("likes")
+}
