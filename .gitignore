@@ -1,0 +1,32 @@
+# Dependencies (each subproject also has its own .gitignore)
+node_modules/
+
+# Env — commit only the examples
+.env
+.env.*
+!.env.example
+
+# Build output
+.next/
+dist/
+build/
+out/
+
+# Prisma generated client
+backend/src/generated/
+
+# Logs & misc
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.tsbuildinfo
+next-env.d.ts
+
+# Claude Code agent notes (not part of the deliverable)
+AGENTS.md
+CLAUDE.md
