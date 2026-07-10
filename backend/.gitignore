@@ -1,0 +1,14 @@
+node_modules/
+dist/
+
+# env — commit only the example
+.env
+.env.*
+!.env.example
+
+*.log
+.vercel
+coverage/
+
+# Prisma generated client (regenerated via `npm run prisma:generate`)
+src/generated/
