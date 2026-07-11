@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRegisterMutation } from "@/store/api/authApi";
 import { Field } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
+import { FormError } from "@/components/ui/FormError";
 import { getErrorMessage, getFieldErrors } from "@/lib/apiError";
 import { setAuthHint } from "@/lib/auth-cookies";
 
@@ -188,11 +189,7 @@ export default function RegisterPage() {
                     </div>
                   </div>
 
-                  {error ? (
-                    <p className="app-error-text" role="alert">
-                      {error}
-                    </p>
-                  ) : null}
+                  {error ? <FormError>{error}</FormError> : null}
 
                   <div className="row">
                     <div className="col-lg-12 col-xl-12 col-md-12 col-sm-12">

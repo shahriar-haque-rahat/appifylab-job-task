@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useLoginMutation } from "@/store/api/authApi";
 import { Field } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
+import { FormError } from "@/components/ui/FormError";
 import { getErrorMessage, getFieldErrors } from "@/lib/apiError";
 import { setAuthHint } from "@/lib/auth-cookies";
 
@@ -123,11 +124,7 @@ export default function LoginPage() {
                     </div>
                   </div>
 
-                  {error ? (
-                    <p className="app-error-text" role="alert">
-                      {error}
-                    </p>
-                  ) : null}
+                  {error ? <FormError>{error}</FormError> : null}
 
                   <div className="row">
                     <div className="col-lg-6 col-xl-6 col-md-6 col-sm-12">
