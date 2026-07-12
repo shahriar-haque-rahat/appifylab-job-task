@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import {
   useUpdatePostMutation,
   useDeletePostMutation,
@@ -9,6 +9,8 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Dropdown } from "@/components/ui/Dropdown";
 import { LinkButton } from "@/components/ui/LinkButton";
 import { FormError } from "@/components/ui/FormError";
+import { Modal } from "@/components/ui/Modal";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ReactionBar } from "./ReactionBar";
 import { LikeAvatarStack } from "./LikeAvatarStack";
 import { CommentsSection } from "./CommentsSection";
@@ -22,17 +24,28 @@ import {
 } from "@/components/icons";
 import { timeAgo, fullName } from "@/lib/format";
 import { getErrorMessage } from "@/lib/apiError";
+import { cloudinaryVariant } from "@/lib/img";
 import type { Post, Visibility } from "@/lib/types";
 
 export function PostCard({ post }: { post: Post }) {
   const [updatePost, { isLoading: saving }] = useUpdatePostMutation();
-  const [deletePost] = useDeletePostMutation();
+  const [deletePost, { isLoading: deleting }] = useDeletePostMutation();
 
   const [showComments, setShowComments] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [editText, setEditText] = useState(post.text);
   const [editVis, setEditVis] = useState<Visibility>(post.visibility);
   const [error, setError] = useState<string | null>(null);
+  const [imgBroken, setImgBroken] = useState(false);
+  const editTitleId = useId();
+
+  function openEdit() {
+    setEditText(post.text);
+    setEditVis(post.visibility);
+    setError(null);
+    setEditing(true);
+  }
 
   async function saveEdit() {
     setError(null);
@@ -47,17 +60,19 @@ export function PostCard({ post }: { post: Post }) {
       }).unwrap();
       setEditing(false);
     } catch (err) {
+      // Non-blocking toast is raised by the mutation; keep an inline hint too.
       setError(getErrorMessage(err, "Could not update the post."));
     }
   }
 
-  async function onDelete() {
-    if (!window.confirm("Delete this post? This cannot be undone.")) return;
-    try {
-      await deletePost(post.id).unwrap();
-    } catch (err) {
-      window.alert(getErrorMessage(err, "Could not delete the post."));
-    }
+  function confirmDelete() {
+    // Optimistic removal happens instantly; errors surface via toast + rollback.
+    setConfirmingDelete(false);
+    deletePost(post.id)
+      .unwrap()
+      .catch(() => {
+        /* handled by the mutation's rollback + toast */
+      });
   }
 
   return (
@@ -113,10 +128,8 @@ export function PostCard({ post }: { post: Post }) {
                       type="button"
                       className="_feed_timeline_dropdown_link"
                       onClick={() => {
-                        setEditText(post.text);
-                        setEditVis(post.visibility);
-                        setEditing(true);
                         close();
+                        openEdit();
                       }}
                     >
                       <span>
@@ -131,7 +144,7 @@ export function PostCard({ post }: { post: Post }) {
                       className="_feed_timeline_dropdown_link"
                       onClick={() => {
                         close();
-                        onDelete();
+                        setConfirmingDelete(true);
                       }}
                     >
                       <span>
@@ -146,51 +159,21 @@ export function PostCard({ post }: { post: Post }) {
           ) : null}
         </div>
 
-        {editing ? (
-          <div className="mt-3">
-            <textarea
-              className="form-control _textarea"
-              value={editText}
-              onChange={(e) => setEditText(e.target.value)}
-              rows={3}
-              maxLength={5000}
-            />
-            <div className="mt-2.5 flex flex-wrap items-center gap-3">
-              <VisibilitySelector
-                value={editVis}
-                onChange={setEditVis}
-                disabled={saving}
-              />
-              <button
-                type="button"
-                className="_btn1 px-5.5 py-2 text-[14px]"
-                onClick={saveEdit}
-                disabled={saving}
-              >
-                {saving ? "Saving…" : "Save"}
-              </button>
-              <LinkButton
-                onClick={() => {
-                  setEditing(false);
-                  setEditText(post.text);
-                  setEditVis(post.visibility);
-                  setError(null);
-                }}
-              >
-                Cancel
-              </LinkButton>
-            </div>
-            {error ? <FormError>{error}</FormError> : null}
-          </div>
-        ) : post.text ? (
+        {post.text ? (
           <h4 className="_feed_inner_timeline_post_title whitespace-pre-wrap">
             {post.text}
           </h4>
         ) : null}
 
-        {post.imageUrl && !editing ? (
+        {post.imageUrl && !imgBroken ? (
           <div className="_feed_inner_timeline_image">
-            <img src={post.imageUrl} alt="" className="_time_img" />
+            <img
+              src={cloudinaryVariant(post.imageUrl, 900)}
+              alt=""
+              className="_time_img"
+              loading="lazy"
+              onError={() => setImgBroken(true)}
+            />
           </div>
         ) : null}
       </div>
@@ -202,6 +185,7 @@ export function PostCard({ post }: { post: Post }) {
               targetType="post"
               targetId={post.id}
               count={post.likesCount}
+              preview={post.likePreview}
             />
           </div>
           <div className="_feed_inner_timeline_total_reacts_txt">
@@ -225,6 +209,68 @@ export function PostCard({ post }: { post: Post }) {
       />
 
       {showComments ? <CommentsSection postId={post.id} /> : null}
+
+      {/* Edit post — styled modal (Item 3). */}
+      <Modal open={editing} onClose={() => setEditing(false)} labelledBy={editTitleId}>
+        <div className="mb-4 flex items-center justify-between">
+          <h3 id={editTitleId} className="text-[17px] font-semibold">
+            Edit post
+          </h3>
+          <button
+            type="button"
+            className="cursor-pointer rounded-md border-0 bg-transparent px-1 text-[22px] leading-none text-muted hover:text-ink"
+            onClick={() => setEditing(false)}
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+
+        <textarea
+          className="w-full resize-none rounded-lg border border-line bg-surface-2/40 p-3 text-[14px] leading-relaxed text-ink-strong outline-none focus:border-primary"
+          value={editText}
+          onChange={(e) => setEditText(e.target.value)}
+          rows={4}
+          maxLength={5000}
+          autoFocus
+        />
+
+        {error ? <FormError>{error}</FormError> : null}
+
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <VisibilitySelector value={editVis} onChange={setEditVis} disabled={saving} />
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              className="cursor-pointer rounded-lg border border-line bg-transparent px-4 py-2 text-[14px] font-medium text-ink hover:bg-surface-2 disabled:opacity-60"
+              onClick={() => setEditing(false)}
+              disabled={saving}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="cursor-pointer rounded-lg border-0 bg-primary px-5 py-2 text-[14px] font-semibold text-white hover:bg-primary-hover disabled:opacity-60"
+              onClick={saveEdit}
+              disabled={saving}
+            >
+              {saving ? "Saving…" : "Save changes"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete post — non-blocking confirm (Item 3 / Item 9). */}
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="Delete post?"
+        message="This post will be permanently removed. This cannot be undone."
+        confirmLabel="Delete"
+        destructive
+        busy={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </div>
   );
 }

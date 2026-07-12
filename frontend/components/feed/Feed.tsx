@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useGetFeedQuery } from "@/store/api/postsApi";
 import { PostComposer } from "./PostComposer";
 import { PostCard } from "./PostCard";
-import { Spinner } from "@/components/ui/Spinner";
+import { PostCardSkeleton } from "@/components/ui/Skeleton";
 import { FormError } from "@/components/ui/FormError";
 import { getErrorMessage } from "@/lib/apiError";
 
@@ -27,28 +27,36 @@ export function Feed() {
   }, []);
 
   // Infinite scroll via IntersectionObserver sentinel.
+  const scrollRootRef = useRef<HTMLDivElement>(null); // pass this down or find via closest()
   const sentinelRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
+    const root = el.closest("._layout_middle_wrap") as HTMLElement | null;
     const obs = new IntersectionObserver(
       (entries) => {
+        console.log("sentinel intersecting:", entries[0]?.isIntersecting);
         if (entries[0]?.isIntersecting) loadMore();
       },
-      { rootMargin: "300px" }
+      { root, rootMargin: "300px" }
     );
     obs.observe(el);
     return () => obs.disconnect();
   }, [loadMore]);
+
+  console.log("nextCursor:", nextCursor, "isFetching:", isFetching, "items:", items.length);
 
   return (
     <>
       <PostComposer onCreated={onCreated} />
 
       {isLoading ? (
-        <div className="p-8 text-center">
-          <Spinner dark />
-        </div>
+        <>
+          <PostCardSkeleton />
+          <PostCardSkeleton />
+          <PostCardSkeleton />
+        </>
       ) : null}
 
       {isError && items.length === 0 ? (
@@ -74,11 +82,7 @@ export function Feed() {
 
       <div ref={sentinelRef} aria-hidden="true" />
 
-      {isFetching && cursor ? (
-        <div className="p-4 text-center">
-          <Spinner dark />
-        </div>
-      ) : null}
+      {isFetching && cursor ? <PostCardSkeleton /> : null}
 
       {!nextCursor && items.length > 0 ? (
         <p className="pb-10 pt-3 text-center text-muted-2">

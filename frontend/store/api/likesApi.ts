@@ -1,54 +1,36 @@
 import { baseApi } from "./baseApi";
-import { postsApi } from "./postsApi";
-import { commentsApi } from "./commentsApi";
-import type { AppDispatch } from "../store";
+import { currentUser, toSummary } from "./optimisticHelpers";
+import {
+  patchCache,
+  applyPreview,
+  reconcileLike,
+  type LikeArg,
+} from "./likeUtils";
 import type { LikeResult, LikeTarget, Page, UserSummary } from "@/lib/types";
+import { showToast } from "@/lib/toast";
 
-// Extra context lets us optimistically patch the RIGHT cache entry (the feed for
-// posts, the comments/replies list for comments).
-export interface LikeArg {
-  targetType: LikeTarget;
-  targetId: string;
-  postId?: string;
-  parentId?: string | null;
-}
+type Likeable = {
+  likedByMe: boolean;
+  likesCount: number;
+  likePreview?: UserSummary[];
+};
 
-type Likeable = { likedByMe: boolean; likesCount: number };
-
-// Apply `recipe` to the cached item for this like target; returns the patch so
-// it can be undone on failure.
-function patchCache(
-  dispatch: AppDispatch,
+function patchLikers(
+  dispatch: any,
   arg: LikeArg,
-  recipe: (item: Likeable) => void
+  viewer: UserSummary | null,
+  liked: boolean
 ) {
-  if (arg.targetType === "post") {
-    return dispatch(
-      postsApi.util.updateQueryData("getFeed", undefined, (draft) => {
-        const p = draft.items.find((x) => x.id === arg.targetId);
-        if (p) recipe(p);
-      })
-    );
-  }
-  if (arg.parentId) {
-    return dispatch(
-      commentsApi.util.updateQueryData(
-        "getReplies",
-        { commentId: arg.parentId },
-        (draft) => {
-          const c = draft.items.find((x) => x.id === arg.targetId);
-          if (c) recipe(c);
-        }
-      )
-    );
-  }
+  if (!viewer) return undefined;
   return dispatch(
-    commentsApi.util.updateQueryData(
-      "getComments",
-      { postId: arg.postId as string },
-      (draft) => {
-        const c = draft.items.find((x) => x.id === arg.targetId);
-        if (c) recipe(c);
+    likesApi.util.updateQueryData(
+      "getLikers",
+      { targetType: arg.targetType, targetId: arg.targetId },
+      (draft: Page<UserSummary>) => {
+        const exists = draft.items.some((u) => u.id === viewer.id);
+        if (liked && !exists) draft.items.unshift(viewer);
+        else if (!liked && exists)
+          draft.items = draft.items.filter((u) => u.id !== viewer.id);
       }
     )
   );
@@ -57,22 +39,30 @@ function patchCache(
 async function optimisticToggle(
   arg: LikeArg,
   liked: boolean,
-  dispatch: AppDispatch,
+  dispatch: any,
+  getState: () => unknown,
   queryFulfilled: Promise<{ data: LikeResult }>
 ) {
-  const patch = patchCache(dispatch, arg, (it) => {
-    it.likedByMe = liked;
-    it.likesCount = Math.max(0, it.likesCount + (liked ? 1 : -1));
-  });
+  const user = currentUser(getState);
+  const viewer = user ? toSummary(user) : null;
+
+  const patches = [
+    patchCache(dispatch, arg, (it) => {
+      it.likedByMe = liked;
+      it.likesCount = Math.max(0, it.likesCount + (liked ? 1 : -1));
+      applyPreview(it, viewer, liked);
+    }),
+    patchLikers(dispatch, arg, viewer, liked),
+  ];
+
   try {
     const { data } = await queryFulfilled;
-    // Reconcile to the server's authoritative values.
-    patchCache(dispatch, arg, (it) => {
-      it.likedByMe = data.liked;
-      it.likesCount = data.likesCount;
-    });
+    reconcileLike(dispatch, arg, data);
   } catch {
-    patch.undo();
+    for (const p of patches) p?.undo();
+    showToast(
+      liked ? "Couldn't like that. Please try again." : "Couldn't remove your like. Please try again."
+    );
   }
 }
 
@@ -86,8 +76,8 @@ export const likesApi = baseApi.injectEndpoints({
       invalidatesTags: (_r, _e, arg) => [
         { type: "Likers", id: `${arg.targetType}-${arg.targetId}` },
       ],
-      onQueryStarted: (arg, { dispatch, queryFulfilled }) =>
-        optimisticToggle(arg, true, dispatch, queryFulfilled),
+      onQueryStarted: (arg, { dispatch, getState, queryFulfilled }) =>
+        optimisticToggle(arg, true, dispatch, getState, queryFulfilled),
     }),
 
     unlikeTarget: build.mutation<LikeResult, LikeArg>({
@@ -98,11 +88,10 @@ export const likesApi = baseApi.injectEndpoints({
       invalidatesTags: (_r, _e, arg) => [
         { type: "Likers", id: `${arg.targetType}-${arg.targetId}` },
       ],
-      onQueryStarted: (arg, { dispatch, queryFulfilled }) =>
-        optimisticToggle(arg, false, dispatch, queryFulfilled),
+      onQueryStarted: (arg, { dispatch, getState, queryFulfilled }) =>
+        optimisticToggle(arg, false, dispatch, getState, queryFulfilled),
     }),
 
-    // "Who liked" — lazy-loaded on demand (keeps the feed query cheap at scale).
     getLikers: build.query<
       Page<UserSummary>,
       { targetType: LikeTarget; targetId: string; cursor?: string }

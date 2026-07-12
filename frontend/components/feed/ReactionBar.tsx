@@ -1,13 +1,11 @@
 "use client";
 
-import {
-  useLikeTargetMutation,
-  useUnlikeTargetMutation,
-} from "@/store/api/likesApi";
+import { useDebouncedLike } from "@/store/api/useDebouncedLike";
 import { ThumbIcon, CommentIcon, ShareIcon } from "@/components/icons";
 
 // Post action bar (Like / Comment / Share). Like state comes from the post prop
-// (backed by the RTK cache); the like mutation patches that cache optimistically.
+// (backed by the RTK cache); the like mutation uses debounced toggle with
+// instant optimistic UI updates.
 export function ReactionBar({
   postId,
   liked,
@@ -18,13 +16,13 @@ export function ReactionBar({
   likesCount?: number;
   onCommentClick: () => void;
 }) {
-  const [like] = useLikeTargetMutation();
-  const [unlike] = useUnlikeTargetMutation();
+  const debouncedToggle = useDebouncedLike();
 
   function toggle() {
-    const arg = { targetType: "post" as const, targetId: postId, postId };
-    if (liked) unlike(arg);
-    else like(arg);
+    debouncedToggle(
+      { targetType: "post", targetId: postId, postId },
+      liked
+    );
   }
 
   return (
