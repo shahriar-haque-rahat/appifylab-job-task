@@ -15,7 +15,8 @@
  * 0.25rem step — e.g. 8px = 2, 12px = 3, 24px = 6, 44px = 11).
  *
  * Loaded by app/globals.css via `@config`. Preflight is intentionally NOT
- * enabled there, so these tokens layer on top of the untouched template CSS.
+ * enabled, so these tokens/utilities layer on top of the template rules that now
+ * live (tree-shaken) inside the `@layer template` block of globals.css.
  */
 module.exports = {
   content: [

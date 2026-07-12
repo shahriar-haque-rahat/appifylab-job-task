@@ -1,14 +1,11 @@
-// Provided template stylesheets, imported globally and untouched, in the
-// original <head> order (bootstrap → common → main → responsive). globals.css
-// loads last so project-specific additions layer on top without editing vendor CSS.
-import "./styles/bootstrap.min.css";
-import "./styles/common.css";
-import "./styles/main.css";
-import "./styles/responsive.css";
+// Single stylesheet: the tree-shaken template rules (merged under an `@layer
+// template`), Tailwind's theme + utilities, and the app-specific global rules —
+// all consolidated into globals.css. The four legacy stylesheets were removed.
 import "./globals.css";
 
 import type { Metadata } from "next";
 import { ReduxProvider } from "@/store/ReduxProvider";
+import { ThemeProvider } from "@/components/theme/ThemeProvider";
 
 export const metadata: Metadata = {
   title: "Buddy Script",
@@ -33,7 +30,9 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <ReduxProvider>{children}</ReduxProvider>
+        <ReduxProvider>
+          <ThemeProvider>{children}</ThemeProvider>
+        </ReduxProvider>
       </body>
     </html>
   );
