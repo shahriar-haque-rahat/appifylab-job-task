@@ -29,6 +29,14 @@ const login = asyncHandler(async (req, res) => {
   res.status(200).json({ user, csrfToken: session.csrfToken });
 });
 
+const google = asyncHandler(async (req, res) => {
+  const { user, ...session } = await service.loginWithGoogle(
+    req.valid.body.credential
+  );
+  applySession(res, session);
+  res.status(200).json({ user, csrfToken: session.csrfToken });
+});
+
 const refresh = asyncHandler(async (req, res) => {
   const token = req.cookies?.[REFRESH_COOKIE];
   const { user, ...session } = await service.refresh(token);
@@ -43,4 +51,4 @@ const logout = asyncHandler(async (req, res) => {
   res.status(204).end();
 });
 
-module.exports = { register, login, refresh, logout };
+module.exports = { register, login, google, refresh, logout };

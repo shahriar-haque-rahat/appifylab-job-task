@@ -1,15 +1,5 @@
 "use strict";
 
-/**
- * Ownership guard factory. Given a loader that resolves the target resource
- * (must expose `authorId`), it 404s if missing and 403s unless
- * `resource.authorId === req.user.id`. The loaded resource is cached on
- * `req.resource` so the controller need not re-fetch it.
- *
- * This runs BEFORE the controller on every edit/delete route — ownership is
- * enforced server-side, never trusted from the client.
- */
-
 const { asyncHandler } = require("../utils/asyncHandler");
 const { ApiError } = require("../utils/ApiError");
 

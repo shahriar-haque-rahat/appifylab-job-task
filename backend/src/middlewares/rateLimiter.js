@@ -1,16 +1,5 @@
 "use strict";
 
-/**
- * Redis-backed rate limiters (express-rate-limit + rate-limit-redis), so limits
- * are shared across instances and survive restarts. Limits mirror the security
- * checklist:
- *   login    5 / 15min  per IP+email
- *   register 10 / 1hr   per IP
- *   refresh  20 / 15min per refresh-token (falls back to IP)
- *   content  20 / 1min  per user (post/comment creation)
- *   general  100 / 1min per IP (all /api)
- */
-
 const rateLimit = require("express-rate-limit");
 const { RedisStore } = require("rate-limit-redis");
 const { redis } = require("../config/redis");
@@ -20,12 +9,6 @@ const { REFRESH_COOKIE } = require("../utils/cookies");
 
 const MINUTE = 60 * 1000;
 
-/**
- * IPv6-safe IP key. (express-rate-limit's `ipKeyGenerator` helper is not exported
- * by the installed CJS build, so we normalize here.) IPv6 addresses are
- * aggregated to their /64 network so a client can't trivially bypass a per-IP
- * limit by rotating addresses within its own subnet.
- */
 function ipKey(req) {
   const ip = req.ip || req.socket?.remoteAddress || "unknown";
   if (ip.includes(":")) {
@@ -72,6 +55,17 @@ const registerLimiter = createLimiter({
   message: "Too many accounts created from this network. Try again later.",
 });
 
+// Google sign-in verifies a signed token server-side, so this is a light
+// abuse guard rather than a credential-stuffing guard: per-IP, fairly generous
+// (a shared network may have several users signing in).
+const googleLimiter = createLimiter({
+  prefix: "google",
+  windowMs: 15 * MINUTE,
+  max: 20,
+  keyGenerator: (req) => ipKey(req),
+  message: "Too many Google sign-in attempts. Try again in a few minutes.",
+});
+
 const refreshLimiter = createLimiter({
   prefix: "refresh",
   windowMs: 15 * MINUTE,
@@ -103,6 +97,7 @@ module.exports = {
   createLimiter,
   loginLimiter,
   registerLimiter,
+  googleLimiter,
   refreshLimiter,
   contentCreateLimiter,
   generalLimiter,

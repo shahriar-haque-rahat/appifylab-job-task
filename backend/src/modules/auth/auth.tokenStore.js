@@ -1,13 +1,5 @@
 "use strict";
 
-/**
- * Redis-backed refresh-token store — the SOURCE OF TRUTH for hot-path refresh
- * validation. Each active refresh token is stored as `rt:<jti> -> "<userId>:<hash>"`
- * with a TTL equal to the token lifetime, so expiry is automatic. The Postgres
- * refresh_tokens table is the durability/audit backstop (survives a Redis flush
- * and records revocations for reuse detection).
- */
-
 const { redis } = require("../../config/redis");
 
 const key = (jti) => `rt:${jti}`;
