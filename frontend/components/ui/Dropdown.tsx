@@ -7,21 +7,9 @@ interface DropdownProps {
   children: (o: { close: () => void }) => ReactNode;
   panelClassName?: string;
   wrapperClassName?: string;
-  /**
-   * When true (default) the panel stays mounted and gets a `show` class while
-   * open — matches the template dropdowns whose CSS animates via `.show`.
-   * When false the panel is only mounted while open (used by Tailwind panels
-   * such as the visibility selector, which have no `.show` display rule).
-   */
   renderWhenClosed?: boolean;
 }
 
-/**
- * Generic click-to-toggle dropdown. Closes on outside-click / Escape. The
- * wrapper is positioned `relative` (Tailwind) so the absolutely-positioned panel
- * anchors to it. Reused for the post menu, profile menu, and the visibility
- * selector.
- */
 export function Dropdown({
   trigger,
   children,

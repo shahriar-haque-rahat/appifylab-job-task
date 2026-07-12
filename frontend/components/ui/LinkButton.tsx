@@ -5,15 +5,6 @@ interface LinkButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   active?: boolean;
 }
 
-/**
- * Text-style inline action button used across the feed (comment Like / Reply /
- * Edit / Delete, "view replies", comment-count toggles). Replaces the old
- * `.linklike` global class with Tailwind utilities:
- *   background:none; border:none; padding/margin:0; font:inherit; weight 500;
- *   color #65676b → hover #1890ff + underline; `.liked` → #1890ff.
- * Font size/family inherit from the surrounding text via bootstrap's reboot.
- * Pass Tailwind spacing utilities through `className` (e.g. "mt-0.5", "ml-11").
- */
 export function LinkButton({
   active = false,
   className = "",

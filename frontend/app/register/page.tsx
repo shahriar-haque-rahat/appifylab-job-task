@@ -7,12 +7,10 @@ import { useRegisterMutation } from "@/store/api/authApi";
 import { Field } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { getErrorMessage, getFieldErrors } from "@/lib/apiError";
 import { setAuthHint } from "@/lib/auth-cookies";
 
-// Converted from supporting documents/registration.html.
-// Design deviation: added First name / Last name fields (styled with the
-// existing registration input classes) since the brief requires them.
 export default function RegisterPage() {
   const router = useRouter();
   const [register, { isLoading }] = useRegisterMutation();
@@ -34,8 +32,19 @@ export default function RegisterPage() {
     setError(null);
     setFieldErrors({});
 
-    if (form.password !== form.confirmPassword) {
-      setFieldErrors({ confirmPassword: "Passwords do not match" });
+    // Client-side checks for instant inline feedback (server re-validates too).
+    const clientErrors: Record<string, string> = {};
+    if (!form.firstName.trim()) clientErrors.firstName = "First name is required.";
+    if (!form.lastName.trim()) clientErrors.lastName = "Last name is required.";
+    if (!form.email.trim()) clientErrors.email = "Email is required.";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
+      clientErrors.email = "Enter a valid email address.";
+    if (!form.password) clientErrors.password = "Password is required.";
+    if (form.password && form.password !== form.confirmPassword) {
+      clientErrors.confirmPassword = "Passwords do not match.";
+    }
+    if (Object.keys(clientErrors).length) {
+      setFieldErrors(clientErrors);
       return;
     }
 
@@ -55,7 +64,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <section className="_social_registration_wrapper _layout_main_wrapper">
+    <section className="_social_registration_wrapper _layout_main_wrapper flex min-h-screen flex-col justify-center py-8!">
       <div className="_shape_one">
         <img src="/images/shape1.svg" alt="" className="_shape_img" />
         <img src="/images/dark_shape.svg" alt="" className="_dark_shape" />
@@ -98,18 +107,14 @@ export default function RegisterPage() {
                 <p className="_social_registration_content_para _mar_b8">
                   Get Started Now
                 </p>
-                <h4 className="_social_registration_content_title _titl4 _mar_b50">
+                <h4 className="_social_registration_content_title _titl4 _mar_b50 mb-6!">
                   Registration
                 </h4>
-                <button
-                  type="button"
-                  className="_social_registration_content_btn _mar_b40"
-                  title="Social sign-up is not part of this task"
-                >
-                  <img src="/images/google.svg" alt="" className="_google_img" />{" "}
-                  <span>Register with google</span>
-                </button>
-                <div className="_social_registration_content_bottom_txt _mar_b40">
+                <GoogleSignInButton
+                  label="Register with google"
+                  text="signup_with"
+                />
+                <div className="_social_registration_content_bottom_txt _mar_b40 mb-5!">
                   {" "}
                   <span>Or</span>
                 </div>
@@ -212,10 +217,10 @@ export default function RegisterPage() {
                   </div>
                   <div className="row">
                     <div className="col-lg-12 col-md-12 col-xl-12 col-sm-12">
-                      <div className="_social_registration_form_btn _mar_t40 _mar_b60">
+                      <div className="_social_registration_form_btn _mar_t40 _mar_b60 mt-6! mb-4!">
                         <Button
                           type="submit"
-                          className="_social_registration_form_btn_link _btn1"
+                          className="_social_registration_form_btn_link _btn1 inline-flex w-full items-center justify-center whitespace-nowrap px-6!"
                           loading={isLoading}
                           loadingText="Creating account…"
                         >

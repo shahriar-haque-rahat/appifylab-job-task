@@ -1,6 +1,3 @@
-// Loading spinners, styled with Tailwind utilities (theme tokens from
-// tailwind.config.js). `dark` swaps the white ring for the brand-blue ring used
-// on light surfaces. Uses Tailwind's built-in `animate-spin`.
 export function Spinner({
   className = "",
   dark = false,

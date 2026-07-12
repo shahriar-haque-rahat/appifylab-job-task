@@ -7,10 +7,10 @@ import { useLoginMutation } from "@/store/api/authApi";
 import { Field } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { FormError } from "@/components/ui/FormError";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { getErrorMessage, getFieldErrors } from "@/lib/apiError";
 import { setAuthHint } from "@/lib/auth-cookies";
 
-// Converted 1:1 from supporting documents/login.html, wired to the auth API.
 export default function LoginPage() {
   const router = useRouter();
   const [login, { isLoading }] = useLoginMutation();
@@ -18,11 +18,28 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [next] = useState(() =>
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("next") ?? undefined
+      : undefined
+  );
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setFieldErrors({});
+
+    // Client-side checks for instant inline feedback (server re-validates too).
+    const clientErrors: Record<string, string> = {};
+    if (!email.trim()) clientErrors.email = "Email is required.";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      clientErrors.email = "Enter a valid email address.";
+    if (!password) clientErrors.password = "Password is required.";
+    if (Object.keys(clientErrors).length) {
+      setFieldErrors(clientErrors);
+      return;
+    }
+
     try {
       await login({ email, password }).unwrap();
       // Ensure the route-protection hint cookie exists BEFORE we navigate, so the
@@ -40,7 +57,7 @@ export default function LoginPage() {
   }
 
   return (
-    <section className="_social_login_wrapper _layout_main_wrapper">
+    <section className="_social_login_wrapper _layout_main_wrapper flex min-h-screen flex-col justify-center py-8!">
       <div className="_shape_one">
         <img src="/images/shape1.svg" alt="" className="_shape_img" />
         <img src="/images/dark_shape.svg" alt="" className="_dark_shape" />
@@ -77,18 +94,15 @@ export default function LoginPage() {
                   <img src="/images/logo.svg" alt="Buddy Script" className="_left_logo" />
                 </div>
                 <p className="_social_login_content_para _mar_b8">Welcome back</p>
-                <h4 className="_social_login_content_title _titl4 _mar_b50">
+                <h4 className="_social_login_content_title _titl4 _mar_b50 mb-6!">
                   Login to your account
                 </h4>
-                <button
-                  type="button"
-                  className="_social_login_content_btn _mar_b40"
-                  title="Social sign-in is not part of this task"
-                >
-                  <img src="/images/google.svg" alt="" className="_google_img" />{" "}
-                  <span>Or sign-in with google</span>
-                </button>
-                <div className="_social_login_content_bottom_txt _mar_b40">
+                <GoogleSignInButton
+                  label="Or sign-in with google"
+                  text="signin_with"
+                  next={next}
+                />
+                <div className="_social_login_content_bottom_txt _mar_b40 mb-5!">
                   {" "}
                   <span>Or</span>
                 </div>
@@ -151,10 +165,10 @@ export default function LoginPage() {
                   </div>
                   <div className="row">
                     <div className="col-lg-12 col-md-12 col-xl-12 col-sm-12">
-                      <div className="_social_login_form_btn _mar_t40 _mar_b60">
+                      <div className="_social_login_form_btn _mar_t40 _mar_b60 mt-7! mb-4!">
                         <Button
                           type="submit"
-                          className="_social_login_form_btn_link _btn1"
+                          className="_social_login_form_btn_link _btn1 inline-flex w-full items-center justify-center whitespace-nowrap px-6!"
                           loading={isLoading}
                           loadingText="Signing in…"
                         >

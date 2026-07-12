@@ -9,11 +9,6 @@ interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
   labelClassName?: string;
 }
 
-/**
- * Label + input + inline error. The template class names are passed in so this
- * one component serves login, registration, and any future form 1:1 with the
- * provided design.
- */
 export function Field({
   label,
   error,

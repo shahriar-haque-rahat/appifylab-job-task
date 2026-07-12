@@ -7,17 +7,80 @@ import { useAppSelector } from "@/store/hooks";
 import { selectAuthUser } from "@/store/authSlice";
 import { useLogoutMutation } from "@/store/api/authApi";
 import { Avatar } from "@/components/ui/Avatar";
+import { Dropdown } from "@/components/ui/Dropdown";
 import {
   SearchIcon,
   HomeIcon,
+  FriendRequestIcon,
+  BellIcon,
+  ChatIcon,
   ChevronDownIcon,
+  ChevronRightIcon,
+  GearIcon,
+  HelpIcon,
   LogoutIcon,
 } from "@/components/icons";
 import { fullName } from "@/lib/format";
 
-// Converted from the feed.html header (logo + search + nav + profile menu).
-// The profile dropdown owns the Log Out action; other nav items are decorative
-// per the brief ("focus only on the main functionality of the feed").
+// Seeded, static notifications so the dropdown reflects the design instead of an
+// empty state. Not a real notification system (out of scope) — realistic sample
+// data matching the design's notification card. Uses demo-account names/avatars.
+const DUMMY_NOTIFICATIONS: {
+  id: string;
+  name: string;
+  action: string;
+  avatar: string;
+  time: string;
+  unread: boolean;
+}[] = [
+  {
+    id: "n1",
+    name: "Radovan Novak",
+    action: "liked your post.",
+    avatar: "/images/people1.png",
+    time: "5 minutes ago",
+    unread: true,
+  },
+  {
+    id: "n2",
+    name: "Ayesha Khan",
+    action: "commented on your post: “This looks great!”",
+    avatar: "/images/people2.png",
+    time: "22 minutes ago",
+    unread: true,
+  },
+  {
+    id: "n3",
+    name: "Marcus Lee",
+    action: "replied to your comment.",
+    avatar: "/images/people3.png",
+    time: "1 hour ago",
+    unread: true,
+  },
+  {
+    id: "n4",
+    name: "Dylan Field",
+    action: "liked your post.",
+    avatar: "/images/card_ppl1.png",
+    time: "3 hours ago",
+    unread: false,
+  },
+  {
+    id: "n5",
+    name: "Karim Saif",
+    action: "started following you.",
+    avatar: "/images/card_ppl2.png",
+    time: "Yesterday",
+    unread: false,
+  },
+];
+
+const UNREAD_COUNT = DUMMY_NOTIFICATIONS.filter((n) => n.unread).length;
+
+// Converted from the feed.html header: logo + search + icon nav (home, friend
+// requests, notifications w/ dropdown, messages) + profile menu. Secondary nav
+// links are decorative per the brief ("focus on the feed functionality"); the
+// profile menu owns the real Log Out action.
 export function Header() {
   const user = useAppSelector(selectAuthUser);
   const [logout, { isLoading }] = useLogoutMutation();
@@ -79,6 +142,91 @@ export function Header() {
               <HomeIcon />
             </Link>
           </li>
+
+          <li className="nav-item _header_nav_item">
+            <Link
+              className="nav-link _header_nav_link"
+              href="/feed"
+              aria-label="Friend requests"
+            >
+              <FriendRequestIcon />
+            </Link>
+          </li>
+
+          <li className="nav-item _header_nav_item">
+            <Dropdown
+              wrapperClassName="_header_notify_btn"
+              panelClassName="_notification_dropdown"
+              trigger={({ toggle }) => (
+                <button
+                  type="button"
+                  className="nav-link _header_nav_link _notify_trigger relative border-0 bg-transparent"
+                  onClick={toggle}
+                  aria-label={`Notifications${
+                    UNREAD_COUNT ? `, ${UNREAD_COUNT} unread` : ""
+                  }`}
+                >
+                  <BellIcon />
+                  {UNREAD_COUNT > 0 ? (
+                    <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold leading-none text-white">
+                      {UNREAD_COUNT}
+                    </span>
+                  ) : null}
+                </button>
+              )}
+            >
+              {() => (
+                <>
+                  <div className="_notifications_content">
+                    <h4 className="_notifications_content_title">Notifications</h4>
+                  </div>
+                  <div className="_notifications_drop_box">
+                    <div className="_notifications_drop_btn_grp mb-1 flex gap-2.5">
+                      <button type="button" className="_notifications_btn_link">
+                        All
+                      </button>
+                      <button type="button" className="_notifications_btn_link1">
+                        Unread
+                      </button>
+                    </div>
+                    <div className="_notifications_all">
+                      {DUMMY_NOTIFICATIONS.map((n) => (
+                        <div
+                          key={n.id}
+                          className={`_notification_box${
+                            n.unread ? " bg-active-surface/60" : ""
+                          }`}
+                        >
+                          <div className="_notification_image">
+                            <img src={n.avatar} alt="" className="_notify_img" />
+                          </div>
+                          <div className="_notification_txt">
+                            <p className="_notification_para">
+                              <span className="_notify_txt_link">{n.name}</span>{" "}
+                              {n.action}
+                            </p>
+                            <div className="_nitification_time">
+                              <span>{n.time}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </Dropdown>
+          </li>
+
+          <li className="nav-item _header_nav_item">
+            <Link
+              className="nav-link _header_nav_link"
+              href="/feed"
+              aria-label="Messages"
+            >
+              <ChatIcon />
+            </Link>
+          </li>
         </ul>
 
         <div className="_header_nav_profile relative" ref={profileRef}>
@@ -98,6 +246,7 @@ export function Header() {
               type="button"
               className="_header_nav_dropdown_btn _dropdown_toggle"
               aria-label="Account menu"
+              aria-expanded={open}
             >
               <ChevronDownIcon />
             </button>
@@ -115,6 +264,42 @@ export function Header() {
             </div>
             <hr />
             <ul className="_nav_dropdown_list">
+              <li className="_nav_dropdown_list_item">
+                <button
+                  type="button"
+                  className="_nav_dropdown_link w-full cursor-pointer border-0 bg-transparent text-left"
+                  onClick={() => setOpen(false)}
+                  title="Settings is out of scope for this task"
+                >
+                  <div className="_nav_drop_info">
+                    <span>
+                      <GearIcon />
+                    </span>{" "}
+                    Settings
+                  </div>
+                  <span className="_nav_drop_btn_link">
+                    <ChevronRightIcon />
+                  </span>
+                </button>
+              </li>
+              <li className="_nav_dropdown_list_item">
+                <button
+                  type="button"
+                  className="_nav_dropdown_link w-full cursor-pointer border-0 bg-transparent text-left"
+                  onClick={() => setOpen(false)}
+                  title="Help & Support is out of scope for this task"
+                >
+                  <div className="_nav_drop_info">
+                    <span>
+                      <HelpIcon />
+                    </span>{" "}
+                    Help &amp; Support
+                  </div>
+                  <span className="_nav_drop_btn_link">
+                    <ChevronRightIcon />
+                  </span>
+                </button>
+              </li>
               <li className="_nav_dropdown_list_item">
                 <button
                   type="button"
