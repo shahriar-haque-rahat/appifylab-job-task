@@ -25,6 +25,8 @@ export interface Post {
   author: UserSummary;
   likedByMe: boolean;
   isOwner: boolean;
+  // Up to 3 most-recent likers, for the stacked "who-liked" reactor avatars.
+  likePreview?: UserSummary[];
 }
 
 export interface Comment {
@@ -38,6 +40,8 @@ export interface Comment {
   author: UserSummary;
   likedByMe: boolean;
   isOwner: boolean;
+  // Up to 3 most-recent likers, for the stacked "who-liked" reactor avatars.
+  likePreview?: UserSummary[];
 }
 
 export interface Page<T> {

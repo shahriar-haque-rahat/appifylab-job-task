@@ -48,6 +48,22 @@ export const authApi = baseApi.injectEndpoints({
         }
       },
     }),
+    // Google sign-in: exchange the Google ID token for OUR session. Same
+    // post-login bookkeeping as email/password (reset caches, store csrf, arm the
+    // route-protection hint) so it integrates with the existing auth flow.
+    googleLogin: build.mutation<AuthResponse, { credential: string }>({
+      query: (body) => ({ url: "/auth/google", method: "POST", body }),
+      async onQueryStarted(_arg, { queryFulfilled, dispatch }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(baseApi.util.resetApiState());
+          setStoredCsrf(data.csrfToken);
+          setAuthHint();
+        } catch {
+          /* handled by the caller */
+        }
+      },
+    }),
     logout: build.mutation<void, void>({
       query: () => ({ url: "/auth/logout", method: "POST" }),
       async onQueryStarted(_arg, { queryFulfilled, dispatch }) {
@@ -71,6 +87,7 @@ export const authApi = baseApi.injectEndpoints({
 export const {
   useRegisterMutation,
   useLoginMutation,
+  useGoogleLoginMutation,
   useLogoutMutation,
   useGetMeQuery,
 } = authApi;
