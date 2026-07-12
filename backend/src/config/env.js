@@ -1,12 +1,5 @@
 "use strict";
 
-/**
- * Centralised, zod-validated environment configuration.
- * Loaded once at process start; the app fails fast with a readable error if any
- * required variable is missing or malformed. Nothing else in the codebase reads
- * process.env directly — everything imports from here.
- */
-
 require("dotenv").config();
 const { z } = require("zod");
 
@@ -21,8 +14,9 @@ const schema = z
 
     // --- Datastores ---
     DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
-    // Unpooled connection used for Prisma migrations on Neon. Locally it can equal DATABASE_URL.
-    DATABASE_URL: z.string().min(1).optional(),
+    // Optional unpooled connection used for Prisma migrations on Neon. Locally it
+    // can be omitted (Prisma's datasource uses DATABASE_URL for both url + directUrl).
+    DIRECT_URL: z.string().min(1).optional(),
     REDIS_URL: z.string().min(1, "REDIS_URL is required"),
 
     // --- Auth / crypto ---
@@ -49,6 +43,12 @@ const schema = z
     CLOUDINARY_API_KEY: z.string().optional(),
     CLOUDINARY_API_SECRET: z.string().optional(),
 
+    // --- Google OAuth (optional — "Sign in with Google" disabled if absent) ---
+    // The OAuth 2.0 Client ID from the Google Cloud console. Verified server-side
+    // against the ID token's audience. The client SECRET is not needed for the
+    // Google Identity Services ID-token flow used here.
+    GOOGLE_CLIENT_ID: z.string().optional(),
+
     // --- Misc ---
     PUBLIC_BACKEND_URL: z.string().optional(), // used to build seed static image URLs
     FEED_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(30),
@@ -61,6 +61,7 @@ const schema = z
         env.CLOUDINARY_API_KEY &&
         env.CLOUDINARY_API_SECRET
     );
+    const googleConfigured = Boolean(env.GOOGLE_CLIENT_ID);
     // Cross-domain cookie defaults: prod deploys frontend/backend on different
     // sites, so cookies must be SameSite=None; Secure. Dev is same-site localhost -> lax.
     const sameSite = env.COOKIE_SAMESITE ?? (isProd ? "none" : "lax");
@@ -68,10 +69,11 @@ const schema = z
     return {
       ...env,
       isProd,
-      DATABASE_URL: env.DATABASE_URL ?? env.DATABASE_URL,
+      DIRECT_URL: env.DIRECT_URL ?? env.DATABASE_URL,
       PUBLIC_BACKEND_URL:
         env.PUBLIC_BACKEND_URL ?? `http://localhost:${env.PORT}`,
       cloudinaryConfigured,
+      googleConfigured,
       cookie: {
         sameSite,
         secure,

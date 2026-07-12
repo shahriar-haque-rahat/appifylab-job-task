@@ -1,15 +1,5 @@
 "use strict";
 
-/**
- * Redis client (ioredis). Used for:
- *  - refresh-token source-of-truth (hot-path validation)  [auth module]
- *  - rate limiting (rate-limit-redis store)               [rateLimiter middleware]
- *  - public feed page caching                             [cache/feedCache]
- *
- * A single shared connection is used app-wide. Upstash (hosted) and local Redis
- * (Docker) are both plain redis:// URLs, so no code changes between environments.
- */
-
 const Redis = require("ioredis");
 const { env } = require("./env");
 

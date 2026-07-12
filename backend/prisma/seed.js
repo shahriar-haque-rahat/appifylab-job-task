@@ -1,19 +1,5 @@
 "use strict";
 
-/**
- * Seed script — populates a demo dataset so the feed is alive on first run:
- * several users, a mix of PUBLIC/PRIVATE posts (with images), top-level comments,
- * one-level replies, and likes on posts/comments. Denormalized counts
- * (likesCount/commentsCount) are set to match the inserted rows.
- *
- * Seed IMAGES are served locally by the API from /seed-assets/images/* (option
- * (b) in the plan) — no Cloudinary account is required to get a populated feed.
- * Live uploads made through the app still use Cloudinary. See README.
- *
- * Running `npm run seed` RESETS the demo tables first (idempotent, predictable).
- * Demo login (all users): password `Password123!`
- */
-
 const crypto = require("crypto");
 const bcrypt = require("bcrypt");
 const { env } = require("../src/config/env");
@@ -23,116 +9,169 @@ const img = (name) => `${env.PUBLIC_BACKEND_URL}/seed-assets/images/${name}`;
 const minutesAgo = (m) => new Date(Date.now() - m * 60 * 1000);
 const uuid = () => crypto.randomUUID();
 
+// 8 users, each with a DISTINCT avatar so the feed doesn't visually look
+// like one person under different names.
 const USERS = [
   { key: "dylan", firstName: "Dylan", lastName: "Field", email: "dylan@demo.test", avatar: "profile.png" },
   { key: "karim", firstName: "Karim", lastName: "Saif", email: "karim@demo.test", avatar: "post_img.png" },
   { key: "radovan", firstName: "Radovan", lastName: "Novak", email: "radovan@demo.test", avatar: "txt_img.png" },
   { key: "ayesha", firstName: "Ayesha", lastName: "Khan", email: "ayesha@demo.test", avatar: "people1.png" },
   { key: "marcus", firstName: "Marcus", lastName: "Lee", email: "marcus@demo.test", avatar: "man.png" },
+  { key: "priya", firstName: "Priya", lastName: "Sharma", email: "priya@demo.test", avatar: "people2.png" },
+  { key: "taro", firstName: "Taro", lastName: "Yamamoto", email: "taro@demo.test", avatar: "people3.png" },
+  { key: "elena", firstName: "Elena", lastName: "Petrova", email: "elena@demo.test", avatar: "f1.png" },
 ];
 
-// Curated feed content. `age` = minutes ago (larger = older).
-const POSTS = [
-  {
-    author: "karim",
-    age: 3,
-    visibility: "PUBLIC",
-    text: "Shipped the first build of our Healthy Tracking app today. Months of work finally in users' hands 🎉",
-    image: "timeline_img.png",
-    likes: ["dylan", "radovan", "ayesha", "marcus"],
-    comments: [
-      { by: "ayesha", text: "Huge congrats! Been following this since the prototype.", likes: ["karim", "dylan"], replies: [{ by: "karim", text: "Thanks Ayesha — couldn't have done it without the early feedback 🙏", likes: ["ayesha"] }] },
-      { by: "marcus", text: "The onboarding flow looks so clean. What did you build it with?", likes: [], replies: [{ by: "karim", text: "Next.js on the front, Node + Postgres behind it.", likes: ["marcus"] }] },
-    ],
-  },
-  {
-    author: "dylan",
-    age: 12,
-    visibility: "PUBLIC",
-    text: "Design tip of the day: whitespace is not wasted space. Give your components room to breathe.",
-    image: null,
-    likes: ["karim", "ayesha"],
-    comments: [{ by: "radovan", text: "Preach. My whole team needs to read this 😅", likes: ["dylan"], replies: [] }],
-  },
-  {
-    author: "ayesha",
-    age: 26,
-    visibility: "PUBLIC",
-    text: "Weekend hike was exactly the reset I needed. Nature > notifications.",
-    image: "photos1.png",
-    likes: ["dylan", "karim", "radovan", "marcus"],
-    comments: [],
-  },
-  {
-    author: "karim",
-    age: 40,
-    visibility: "PRIVATE",
-    text: "Private note to self: draft the v2 roadmap — offline mode, sharing, and the analytics dashboard. Not public yet.",
-    image: null,
-    likes: [],
-    comments: [],
-  },
-  {
-    author: "radovan",
-    age: 55,
-    visibility: "PUBLIC",
-    text: "Reading 'Designing Data-Intensive Applications' again. Every re-read it clicks a little more.",
-    image: "img1.png",
-    likes: ["dylan", "karim"],
-    comments: [{ by: "marcus", text: "That book is a rite of passage for backend engineers.", likes: ["radovan"], replies: [] }],
-  },
-  {
-    author: "marcus",
-    age: 78,
-    visibility: "PUBLIC",
-    text: "Coffee, code, repeat. What's everyone building this week?",
-    image: null,
-    likes: ["ayesha"],
-    comments: [
-      { by: "dylan", text: "Redesigning our settings screens. Fun rabbit hole.", likes: [], replies: [] },
-      { by: "karim", text: "Squashing bugs before launch. The eternal grind 🐛", likes: ["marcus"], replies: [] },
-    ],
-  },
-  {
-    author: "dylan",
-    age: 95,
-    visibility: "PRIVATE",
-    text: "Personal draft — a talk proposal on design systems. Keeping this one to myself until it's ready.",
-    image: null,
-    likes: [],
-    comments: [],
-  },
-  {
-    author: "ayesha",
-    age: 130,
-    visibility: "PUBLIC",
-    text: "Mentoring two junior devs this quarter. Teaching is the fastest way to find the gaps in your own knowledge.",
-    image: null,
-    likes: ["radovan", "marcus", "dylan"],
-    comments: [],
-  },
-  {
-    author: "radovan",
-    age: 180,
-    visibility: "PUBLIC",
-    text: "Migrated our feed queries to keyset pagination. Bye-bye slow OFFSET scans 👋",
-    image: "feed_event1.png",
-    likes: ["karim", "marcus"],
-    comments: [{ by: "karim", text: "The performance difference at scale is night and day.", likes: [], replies: [] }],
-  },
-  {
-    author: "karim",
-    age: 240,
-    visibility: "PUBLIC",
-    text: "First post here! Excited to be part of Buddy Script 🚀",
-    image: null,
-    likes: ["dylan", "ayesha", "radovan"],
-    comments: [],
-  },
+const POST_IMAGES = [
+  "img1.png", "img2.png", "img3.png", "img4.png", "img5.png",
+  "img6.png", "img7.png", "img8.png", "img9.png", "img10.png",
+  "img11.png", "img12.png", "photos1.png", "photos2.png", "photos3.png",
+  "photos4.png", "photos5.png", "photos6.png", "photos7.png", "photos8.png",
+  "photos9.png", "slider1.png", "slider2.png", "slider3.png", "slider4.png",
+  "timeline_img.png", "feed_event1.png", "chat_img.png", "chat1_img.png", "chat2_img.png",
+  "chat3_img.png", "chat4_img.png", "chat5_img.png", "chat6_img.png", "chat7_img.png",
+  "post_img.png", "txt_img.png", "profile.png", "man.png", "people1.png",
 ];
+
+function pick(ary) {
+  return ary[Math.floor(Math.random() * ary.length)];
+}
+
+const TOPICS = [
+  "Just shipped a new feature — feeling great about how it came together!",
+  "Coffee, code, and a quiet morning. The best combo.",
+  "Reading 'The Pragmatic Programmer' again. Highlights different things every time.",
+  "Anyone else obsessed with that new framework everyone's talking about?",
+  "Weekend project: built a small CLI tool in Rust. Learning curve is real but rewarding.",
+  "Design is not just how it looks, it's how it works. Every pixel matters.",
+  "Hot take: TypeScript makes JavaScript actually enjoyable to write at scale.",
+  "Spent the afternoon refactoring a 3-year-old codebase. Felt like archaeology.",
+  "Mentorship is a two-way street. I learn as much from my mentees as they do from me.",
+  "The best error message is the one the user never sees.",
+  "Finally understanding monads. Only took me 5 years 😅",
+  "Deployed to production on a Friday. Feeling brave (or foolish).",
+  "Accessibility isn't a feature — it's a fundamental requirement.",
+  "Pair programming all day. Exhausting but the code quality is unreal.",
+  "Migrated our CI/CD pipeline today. Zero downtime. Celebrating with good coffee.",
+  "Just gave my first tech talk. Hands were shaking but I got through it!",
+  "The beauty of open source: standing on the shoulders of giants.",
+  "Why do all my best ideas come in the shower?",
+  "Code reviews are not about catching bugs — they're about sharing knowledge.",
+  "TIL about CSS Container Queries. Game changer for responsive design.",
+  "Nothing beats the feeling of deleting 500 lines of legacy code.",
+  "Interviewing is a skill everyone should practice, even when not job hunting.",
+  "Documentation is love letters to your future self.",
+  "Sometimes the most productive thing you can do is take a walk.",
+  "Docker Compose for local dev is such a game-changer. Reproducible environments FTW.",
+  "Shaved 40% off our API response times by adding the right index. Check your query plans!",
+  "The joy of a green build pipeline after a week of red. Pure dopamine.",
+  "Learning GraphQL after years of REST. The flexibility is incredible.",
+  "Why I love working in a small team: everyone owns their impact.",
+  "Just discovered the Web Animations API. So much power without a library.",
+  "Spent the weekend contributing to an open-source project. Felt great to give back.",
+  "Database migrations done right: test them backward and forward.",
+  "UI/UX tip: every extra click is a lost user. Reduce friction.",
+  "A monorepo isn't right for every team, but when it works, it really works.",
+  "Serverless is not 'no ops' — it's 'different ops'.",
+  "The best APIs are the ones you don't have to think about using.",
+  "Progressive enhancement > graceful degradation. Build for everyone.",
+  "Feature flags have saved my team from so many bad deployments.",
+  "Just hit 1000 days on GitHub! Consistency over intensity.",
+  "Nothing makes you appreciate good documentation like maintaining legacy code.",
+  "Finally convinced the team to adopt automated testing. Baby steps.",
+  "The command line is still the most powerful tool in a developer's arsenal.",
+  "Tech debt is like credit card debt — manageable in small amounts, devastating if ignored.",
+  "A well-written README is a gift to your future self and your users.",
+  "Dark mode isn't just aesthetic — it's an accessibility feature.",
+  "The best code is the code you don't write. Delete more than you add.",
+  "Performance debugging: always measure before you optimize.",
+  "Startup life: building the plane while flying it, but I wouldn't have it any other way.",
+  "Content negotiation in HTTP is underrated. Serve what the client needs.",
+  "Clean architecture isn't about frameworks — it's about boundaries.",
+  "Today I learned: sometimes the simplest solution is the best one.",
+  "The developer experience matters as much as the user experience.",
+  "Automate everything you've done twice. You'll thank yourself later.",
+  "Pairing with a junior dev reminded me how much I love teaching.",
+  "Happy to announce our latest product update! Lots of hard work went into this.",
+];
+
+// 55 posts spread across users with varied images and engagement
+const POSTS = [];
+const userKeys = USERS.map((u) => u.key);
+
+for (let i = 0; i < 55; i++) {
+  const author = pick(userKeys);
+  const age = 3 + i * 8; // spread across 3 min to ~440 min (~7 hours)
+  const visibility = i % 7 === 3 ? "PRIVATE" : "PUBLIC"; // ~1 in 7 private
+  const hasImage = i % 3 !== 1; // 2/3 have images
+  const post = {
+    author,
+    age,
+    visibility,
+    text: TOPICS[i % TOPICS.length],
+    image: hasImage ? pick(POST_IMAGES) : null,
+    likes: [],
+    comments: [],
+  };
+  // Each post gets 1-4 random likes
+  const likers = userKeys.filter((k) => k !== author);
+  const likeCount = 1 + Math.floor(Math.random() * 4);
+  for (let l = 0; l < likeCount && l < likers.length; l++) {
+    post.likes.push(likers[l]);
+  }
+  // ~60% of posts have comments
+  if (Math.random() < 0.6) {
+    const commentCount = 1 + Math.floor(Math.random() * 3);
+    const commenters = userKeys.filter((k) => k !== author);
+    for (let c = 0; c < commentCount && c < commenters.length; c++) {
+      const commentAuthor = commenters[c];
+      const replyAuthors = userKeys.filter((k) => k !== commentAuthor && k !== author);
+      const hasReplies = Math.random() < 0.4;
+      const replyCount = hasReplies ? 1 + Math.floor(Math.random() * 2) : 0;
+      const replies = [];
+      for (let r = 0; r < replyCount && r < replyAuthors.length; r++) {
+        const replyLikes = userKeys.filter((k) => k !== replyAuthors[r] && k !== commentAuthor);
+        const rLikeCount = Math.random() < 0.5 ? 1 + Math.floor(Math.random() * 2) : 0;
+        replies.push({
+          by: replyAuthors[r],
+          text: [
+            "Great point! Totally agree with this.",
+            "Thanks for sharing your perspective!",
+            "I had a similar experience. It's really eye-opening.",
+            "Well said! This resonates with me.",
+            "Interesting take — I hadn't thought of it that way.",
+            "Couldn't agree more! 🙌",
+            "This is exactly what I needed to hear today.",
+            "Thanks! Learned something new.",
+          ][Math.floor(Math.random() * 8)],
+          likes: replyLikes.slice(0, rLikeCount),
+        });
+      }
+      const cLikes = userKeys.filter((k) => k !== commentAuthor);
+      const cLikeCount = Math.random() < 0.5 ? 1 + Math.floor(Math.random() * 2) : 0;
+      post.comments.push({
+        by: commentAuthor,
+        text: [
+          "This is such a great insight! Thanks for sharing.",
+          "Love this perspective. Really makes you think.",
+          "100% agree. I've been saying this for years.",
+          "This was really helpful, thank you!",
+          "I've been following your work and this is another great contribution.",
+          "Can you share more about your approach? I'm curious.",
+          "Brilliant! I'm going to try this out.",
+          "Such a valuable reminder. We all need this sometimes.",
+          "This changed how I think about this topic.",
+          "Bookmarking this for later. So much wisdom here.",
+        ][Math.floor(Math.random() * 10)],
+        likes: cLikes.slice(0, cLikeCount),
+        replies,
+      });
+    }
+  }
+  POSTS.push(post);
+}
 
 async function reset() {
-  // FK-safe order (likes -> comments -> refresh tokens/posts -> users).
   await prisma.like.deleteMany();
   await prisma.comment.deleteMany();
   await prisma.refreshToken.deleteMany();
@@ -141,7 +180,7 @@ async function reset() {
 }
 
 async function main() {
-  console.log("[seed] resetting demo data…");
+  console.log("[seed] resetting demo data\u2026");
   await reset();
 
   const passwordHash = await bcrypt.hash("Password123!", env.BCRYPT_COST);
@@ -172,7 +211,6 @@ async function main() {
     const postId = uuid();
     const createdAt = minutesAgo(p.age);
 
-    // count all comments + replies for commentsCount
     const totalComments = p.comments.reduce(
       (acc, c) => acc + 1 + (c.replies ? c.replies.length : 0),
       0
@@ -268,9 +306,9 @@ async function main() {
   console.log(
     `[seed] created ${postCount} posts, ${commentCount} comments/replies, ${likeRows.length} likes`
   );
-  console.log("[seed] demo login → any of:");
+  console.log("[seed] demo login \u2192 any of:");
   USERS.forEach((u) => console.log(`         ${u.email}  /  Password123!`));
-  console.log("[seed] done ✔");
+  console.log("[seed] done \u2714");
 }
 
 main()

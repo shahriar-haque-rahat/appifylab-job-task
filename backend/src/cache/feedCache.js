@@ -1,23 +1,5 @@
 "use strict";
 
-/**
- * Per-viewer cache of the FIRST feed page (the hot path — most reads are the
- * newest page, refreshed repeatedly). Cached per viewer because the feed is
- * visibility-filtered (`PUBLIC OR own`), so a shared cache can't serve it
- * without risking a private-post leak.
- *
- * Consistency model (documented in README): short TTL => a user's own new
- * post/comment/like busts their own cache for immediacy; other users' new public
- * posts appear within FEED_CACHE_TTL_SECONDS ("eventually consistent feed").
- *
- * PRIVACY-CRITICAL exception: when a post goes PUBLIC -> PRIVATE (or is removed
- * from public visibility), waiting out the TTL would leak now-private content
- * from OTHER viewers' cached pages. For that we bump a GLOBAL generation counter
- * that is part of every cache key, immediately invalidating all first-page
- * caches. Downgrades are rare, so cache effectiveness is preserved for the common
- * case (new posts / likes / comments).
- */
-
 const { redis } = require("../config/redis");
 const { env } = require("../config/env");
 

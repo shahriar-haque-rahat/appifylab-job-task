@@ -1,11 +1,5 @@
 "use strict";
 
-/**
- * Prisma client singleton.
- * ONLY the repository layer imports this. Services depend on repositories, never
- * on Prisma directly (repository pattern) — this keeps query concerns in one place.
- */
-
 const { PrismaClient } = require("@prisma/client");
 const { env } = require("./env");
 

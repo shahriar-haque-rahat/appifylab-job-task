@@ -1,20 +1,28 @@
 "use strict";
 
-/**
- * Cloudinary configuration + a small server-side upload helper.
- *
- * Uploads are performed server-side (the client sends the raw file to our API;
- * we stream it to Cloudinary). This keeps the API secret on the server and lets
- * us validate mime/size before anything leaves our infrastructure — the client
- * never talks to Cloudinary directly and never supplies a final image URL.
- *
- * If Cloudinary env vars are absent the whole app still runs; only live image
- * uploads are disabled (the upload route returns 503). Seed images are served
- * locally and do not require Cloudinary (see prisma/seed.js and README).
- */
-
+const fs = require("fs");
+const path = require("path");
+const crypto = require("crypto");
 const { v2: cloudinary } = require("cloudinary");
 const { env } = require("./env");
+
+// Local disk fallback: when Cloudinary is not configured, uploaded images are
+// written here and served statically from the API at `/uploads/*` (see app.js).
+// This keeps the "create post with image" feature working end-to-end without any
+// external account. NOTE: local disk is ephemeral on PaaS hosts (Render/Railway),
+// so configure Cloudinary before a real deploy for durable storage.
+const UPLOADS_DIR = path.join(__dirname, "..", "..", "uploads");
+
+const MIME_EXT = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+};
+
+function ensureUploadsDir() {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
 
 if (env.cloudinaryConfigured) {
   cloudinary.config({
@@ -51,4 +59,29 @@ function uploadImageBuffer(buffer, opts = {}) {
   });
 }
 
-module.exports = { cloudinary, uploadImageBuffer };
+/**
+ * Persist an in-memory image buffer to the local uploads dir and return a URL
+ * served by our own API. Used when Cloudinary is not configured. The filename is
+ * a random UUID (unguessable) with an extension derived from the validated mime.
+ * @param {Buffer} buffer
+ * @param {string} mimetype
+ * @returns {Promise<{ url: string, publicId: string }>}
+ */
+async function uploadImageBufferLocal(buffer, mimetype) {
+  ensureUploadsDir();
+  const ext = MIME_EXT[mimetype] || "jpg";
+  const filename = `${crypto.randomUUID()}.${ext}`;
+  await fs.promises.writeFile(path.join(UPLOADS_DIR, filename), buffer);
+  return {
+    url: `${env.PUBLIC_BACKEND_URL}/uploads/${filename}`,
+    publicId: filename,
+  };
+}
+
+module.exports = {
+  cloudinary,
+  uploadImageBuffer,
+  uploadImageBufferLocal,
+  ensureUploadsDir,
+  UPLOADS_DIR,
+};
