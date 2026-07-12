@@ -5,41 +5,57 @@ import { useGetLikersQuery } from "@/store/api/likesApi";
 import { Avatar } from "@/components/ui/Avatar";
 import { ThumbIcon } from "@/components/icons";
 import { fullName } from "@/lib/format";
-import type { LikeTarget } from "@/lib/types";
+import type { LikeTarget, UserSummary } from "@/lib/types";
 
-// Shows the like count and, on click, the list of who liked (fetched lazily so
-// the feed query stays cheap). Reused for posts, comments and replies.
 export function LikeAvatarStack({
   targetType,
   targetId,
   count,
+  preview = [],
 }: {
   targetType: LikeTarget;
   targetId: string;
   count: number;
+  preview?: UserSummary[];
 }) {
   const [open, setOpen] = useState(false);
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
   const { data, isFetching } = useGetLikersQuery(
-    { targetType, targetId },
+    { targetType, targetId, cursor },
     { skip: !open }
   );
 
   if (count <= 0) return null;
 
+  const stack = preview.slice(0, 3);
+  const label = `${count} ${count === 1 ? "like" : "likes"}`;
+
   return (
     <div className="relative inline-block">
       <button
         type="button"
-        className="group inline-flex items-center gap-1.5 border-0 bg-transparent p-0 text-[14px] font-medium text-muted"
+        className="group inline-flex items-center gap-2 border-0 bg-transparent p-0 text-[14px] font-medium text-muted"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
+        aria-label={`${label} — show who liked`}
       >
-        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary [&>svg]:filter-[brightness(0)_invert(1)]">
-          <ThumbIcon filled size={12} />
-        </span>
-        <span className="group-hover:underline">
-          {count} {count === 1 ? "like" : "likes"}
-        </span>
+        {stack.length > 0 ? (
+          <span className="_reactor_stack">
+            {stack.map((u) => (
+              <Avatar
+                key={u.id}
+                src={u.avatarUrl}
+                alt={fullName(u)}
+                className="_reactor_avatar"
+              />
+            ))}
+          </span>
+        ) : (
+          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary [&>svg]:filter-[brightness(0)_invert(1)]">
+            <ThumbIcon filled size={12} />
+          </span>
+        )}
+        <span className="group-hover:underline">{label}</span>
       </button>
 
       {open ? (
@@ -60,9 +76,18 @@ export function LikeAvatarStack({
               <span>{fullName(u)}</span>
             </div>
           ))}
-          {data && data.items.length === 0 ? <span>No likes yet</span> : null}
+          {data && data.items.length === 0 ? (
+            <span className="block p-1 text-[12px] text-muted-2">No likes yet</span>
+          ) : null}
           {data?.nextCursor ? (
-            <span className="block p-1 text-[12px] text-muted-2">…and more</span>
+            <button
+              type="button"
+              className="mt-1 block w-full cursor-pointer border-0 bg-transparent p-1 text-left text-[12px] text-primary hover:underline"
+              onClick={() => setCursor(data.nextCursor!)}
+              disabled={isFetching}
+            >
+              {isFetching ? "Loading…" : "Show more"}
+            </button>
           ) : null}
         </div>
       ) : null}

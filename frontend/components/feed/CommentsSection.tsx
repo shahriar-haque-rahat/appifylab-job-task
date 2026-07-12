@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useGetCommentsQuery } from "@/store/api/commentsApi";
 import { CommentComposer } from "./CommentComposer";
 import { CommentThread } from "./CommentThread";
-import { Spinner } from "@/components/ui/Spinner";
+import { CommentSkeleton } from "@/components/ui/Skeleton";
 
 export function CommentsSection({ postId }: { postId: string }) {
   const [cursor, setCursor] = useState<string | undefined>(undefined);
@@ -17,9 +17,10 @@ export function CommentsSection({ postId }: { postId: string }) {
 
       <div className="_timline_comment_main">
         {isLoading ? (
-          <div className="p-3 text-center">
-            <Spinner dark />
-          </div>
+          <>
+            <CommentSkeleton />
+            <CommentSkeleton />
+          </>
         ) : null}
 
         {items.map((c) => (

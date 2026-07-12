@@ -1,5 +1,7 @@
 import { baseApi } from "./baseApi";
 import { postsApi } from "./postsApi";
+import { currentUser, toSummary, makeTempId } from "./optimisticHelpers";
+import { showToast } from "@/lib/toast";
 import type { Comment, Page } from "@/lib/types";
 
 function mergePage(
@@ -44,28 +46,48 @@ export const commentsApi = baseApi.injectEndpoints({
     // Optimistic cache updates (not tag invalidation): the comment/reply lists
     // are accumulated infinite-scroll caches, so an invalidation refetch would
     // re-run with the last cursor and APPEND rather than surface the new item.
-    // We patch the caches directly and keep the feed's commentsCount in sync.
+    // We insert a temp row instantly, then swap it for the server row (or roll it
+    // back on failure), keeping the feed's commentsCount in sync throughout.
     createComment: build.mutation<
       { comment: Comment },
       { postId: string; text: string; parentId?: string }
     >({
       query: (body) => ({ url: "/comments", method: "POST", body }),
-      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
-        try {
-          const { data } = await queryFulfilled;
-          const comment = data.comment;
-          if (arg.parentId) {
+      async onQueryStarted(arg, { dispatch, getState, queryFulfilled }) {
+        const user = currentUser(getState);
+        const tempId = makeTempId();
+        const optimistic: Comment = {
+          id: tempId,
+          postId: arg.postId,
+          parentId: arg.parentId ?? null,
+          text: arg.text,
+          likesCount: 0,
+          repliesCount: 0,
+          createdAt: new Date().toISOString(),
+          author: user
+            ? toSummary(user)
+            : { id: "me", firstName: "You", lastName: "", avatarUrl: null },
+          likedByMe: false,
+          isOwner: true,
+          likePreview: [],
+        };
+
+        const patches = [];
+        if (arg.parentId) {
+          patches.push(
             dispatch(
               commentsApi.util.updateQueryData(
                 "getReplies",
                 { commentId: arg.parentId },
                 (draft) => {
-                  if (!draft.items.some((c) => c.id === comment.id)) {
-                    draft.items.unshift(comment);
+                  if (!draft.items.some((c) => c.id === tempId)) {
+                    draft.items.unshift(optimistic);
                   }
                 }
               )
-            );
+            )
+          );
+          patches.push(
             dispatch(
               commentsApi.util.updateQueryData(
                 "getComments",
@@ -75,29 +97,64 @@ export const commentsApi = baseApi.injectEndpoints({
                   if (parent) parent.repliesCount += 1;
                 }
               )
+            )
+          );
+        } else {
+          patches.push(
+            dispatch(
+              commentsApi.util.updateQueryData(
+                "getComments",
+                { postId: arg.postId },
+                (draft) => {
+                  if (!draft.items.some((c) => c.id === tempId)) {
+                    draft.items.unshift(optimistic);
+                  }
+                }
+              )
+            )
+          );
+        }
+        // Keep the feed card's comment count fresh, instantly.
+        patches.push(
+          dispatch(
+            postsApi.util.updateQueryData("getFeed", undefined, (draft) => {
+              const p = draft.items.find((x) => x.id === arg.postId);
+              if (p) p.commentsCount += 1;
+            })
+          )
+        );
+
+        try {
+          const { data } = await queryFulfilled;
+          // Swap the temp row for the persisted one so its real id backs any
+          // later like / edit / delete on it.
+          const swap = (draft: Page<Comment>) => {
+            const idx = draft.items.findIndex((c) => c.id === tempId);
+            if (idx !== -1) draft.items[idx] = data.comment;
+            else if (!draft.items.some((c) => c.id === data.comment.id)) {
+              draft.items.unshift(data.comment);
+            }
+          };
+          if (arg.parentId) {
+            dispatch(
+              commentsApi.util.updateQueryData(
+                "getReplies",
+                { commentId: arg.parentId },
+                swap
+              )
             );
           } else {
             dispatch(
               commentsApi.util.updateQueryData(
                 "getComments",
                 { postId: arg.postId },
-                (draft) => {
-                  if (!draft.items.some((c) => c.id === comment.id)) {
-                    draft.items.unshift(comment);
-                  }
-                }
+                swap
               )
             );
           }
-          // Keep the feed card's comment count fresh.
-          dispatch(
-            postsApi.util.updateQueryData("getFeed", undefined, (draft) => {
-              const p = draft.items.find((x) => x.id === arg.postId);
-              if (p) p.commentsCount += 1;
-            })
-          );
         } catch {
-          /* surfaced to the composer */
+          for (const p of patches) p.undo();
+          showToast("Couldn't post your comment. Please try again.");
         }
       },
     }),
@@ -112,6 +169,26 @@ export const commentsApi = baseApi.injectEndpoints({
         body: { text },
       }),
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        // Instantly show the edited text; reconcile / roll back on resolution.
+        const applyText = (draft: Page<Comment>) => {
+          const c = draft.items.find((x) => x.id === arg.id);
+          if (c) c.text = arg.text;
+        };
+        const patch = arg.parentId
+          ? dispatch(
+              commentsApi.util.updateQueryData(
+                "getReplies",
+                { commentId: arg.parentId },
+                applyText
+              )
+            )
+          : dispatch(
+              commentsApi.util.updateQueryData(
+                "getComments",
+                { postId: arg.postId },
+                applyText
+              )
+            );
         try {
           const { data } = await queryFulfilled;
           const replace = (draft: Page<Comment>) => {
@@ -136,7 +213,8 @@ export const commentsApi = baseApi.injectEndpoints({
             );
           }
         } catch {
-          /* surfaced to the caller */
+          patch.undo();
+          showToast("Couldn't save your edit. Please try again.");
         }
       },
     }),
@@ -147,29 +225,26 @@ export const commentsApi = baseApi.injectEndpoints({
     >({
       query: ({ id }) => ({ url: `/comments/${id}`, method: "DELETE" }),
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
-        try {
-          const { data } = await queryFulfilled;
-          const removeItem = (draft: Page<Comment>) => {
-            draft.items = draft.items.filter((c) => c.id !== arg.id);
-          };
-          if (arg.parentId) {
+        // Optimistically remove the comment/reply. A deleted top-level comment
+        // cascades to its replies server-side, so decrement the feed count by
+        // (1 + its reply count) up front and reconcile with the server's exact
+        // removedCount afterward.
+        let removed = 1;
+        const patches = [];
+
+        if (arg.parentId) {
+          patches.push(
             dispatch(
               commentsApi.util.updateQueryData(
                 "getReplies",
                 { commentId: arg.parentId },
-                removeItem
+                (draft) => {
+                  draft.items = draft.items.filter((c) => c.id !== arg.id);
+                }
               )
-            );
-          } else {
-            dispatch(
-              commentsApi.util.updateQueryData(
-                "getComments",
-                { postId: arg.postId },
-                removeItem
-              )
-            );
-          }
-          if (arg.parentId) {
+            )
+          );
+          patches.push(
             dispatch(
               commentsApi.util.updateQueryData(
                 "getComments",
@@ -179,21 +254,52 @@ export const commentsApi = baseApi.injectEndpoints({
                   if (parent && parent.repliesCount > 0) parent.repliesCount -= 1;
                 }
               )
-            );
-          }
+            )
+          );
+        } else {
+          patches.push(
+            dispatch(
+              commentsApi.util.updateQueryData(
+                "getComments",
+                { postId: arg.postId },
+                (draft) => {
+                  const target = draft.items.find((c) => c.id === arg.id);
+                  if (target) removed = 1 + (target.repliesCount || 0);
+                  draft.items = draft.items.filter((c) => c.id !== arg.id);
+                }
+              )
+            )
+          );
+        }
+
+        patches.push(
           dispatch(
             postsApi.util.updateQueryData("getFeed", undefined, (draft) => {
               const p = draft.items.find((x) => x.id === arg.postId);
-              if (p) {
-                p.commentsCount = Math.max(
-                  0,
-                  p.commentsCount - (data.removedCount || 1)
-                );
-              }
+              if (p) p.commentsCount = Math.max(0, p.commentsCount - removed);
             })
-          );
+          )
+        );
+
+        try {
+          const { data } = await queryFulfilled;
+          const serverRemoved = data.removedCount ?? removed;
+          if (serverRemoved !== removed) {
+            dispatch(
+              postsApi.util.updateQueryData("getFeed", undefined, (draft) => {
+                const p = draft.items.find((x) => x.id === arg.postId);
+                if (p) {
+                  p.commentsCount = Math.max(
+                    0,
+                    p.commentsCount + removed - serverRemoved
+                  );
+                }
+              })
+            );
+          }
         } catch {
-          /* surfaced to the caller */
+          for (const p of patches) p.undo();
+          showToast("Couldn't delete the comment. Please try again.");
         }
       },
     }),

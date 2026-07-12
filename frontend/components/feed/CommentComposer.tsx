@@ -5,52 +5,52 @@ import { useCreateCommentMutation } from "@/store/api/commentsApi";
 import { useAppSelector } from "@/store/hooks";
 import { selectAuthUser } from "@/store/authSlice";
 import { Avatar } from "@/components/ui/Avatar";
-import { Spinner } from "@/components/ui/Spinner";
-import { FormError } from "@/components/ui/FormError";
 import { SendIcon } from "@/components/icons";
-import { getErrorMessage } from "@/lib/apiError";
 
 // Reused for both top-level comments and replies (pass parentId for a reply).
 export function CommentComposer({
   postId,
   parentId,
+  replyTo,
   onDone,
   autoFocus = false,
   placeholder = "Write a comment",
 }: {
   postId: string;
   parentId?: string;
+  replyTo?: string;
   onDone?: () => void;
   autoFocus?: boolean;
   placeholder?: string;
 }) {
   const user = useAppSelector(selectAuthUser);
-  const [createComment, { isLoading }] = useCreateCommentMutation();
+  const [createComment] = useCreateCommentMutation();
   const [text, setText] = useState("");
-  const [error, setError] = useState<string | null>(null);
 
-  async function submit() {
+  function submit() {
     const t = text.trim();
-    if (!t || isLoading) return;
-    setError(null);
-    try {
-      await createComment({ postId, text: t, parentId }).unwrap();
-      setText("");
-      onDone?.();
-    } catch (err) {
-      setError(getErrorMessage(err, "Could not post your comment."));
-    }
+    if (!t) return;
+    // Optimistic: clear the input and dismiss the composer instantly. The comment
+    // appears in the thread immediately via the mutation's optimistic insert; any
+    // failure rolls it back and raises a non-blocking toast.
+    setText("");
+    onDone?.();
+    createComment({ postId, text: t, parentId })
+      .unwrap()
+      .catch(() => {
+        /* rollback + toast handled by the mutation */
+      });
   }
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
-    void submit();
+    submit();
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      void submit();
+      submit();
     }
   }
 
@@ -62,6 +62,19 @@ export function CommentComposer({
             <Avatar src={user?.avatarUrl} alt="" className="_comment_img" />
           </div>
           <div className="_feed_inner_comment_box_content_txt flex-1">
+            {replyTo ? (
+              <div className="mb-1 text-[12px] text-muted-2">
+                Replying to <span className="font-medium text-ink">{replyTo}</span>
+                <button
+                  type="button"
+                  className="ml-2 cursor-pointer border-0 bg-transparent p-0 text-[13px] text-muted hover:text-ink"
+                  onClick={onDone}
+                  aria-label="Cancel reply"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : null}
             <textarea
               className="form-control _comment_textarea"
               placeholder={placeholder}
@@ -78,14 +91,13 @@ export function CommentComposer({
           <button
             type="submit"
             className="_feed_inner_comment_box_icon_btn"
-            disabled={isLoading || !text.trim()}
+            disabled={!text.trim()}
             aria-label="Send comment"
           >
-            {isLoading ? <Spinner dark /> : <SendIcon />}
+            <SendIcon />
           </button>
         </div>
       </form>
-      {error ? <FormError>{error}</FormError> : null}
     </div>
   );
 }
