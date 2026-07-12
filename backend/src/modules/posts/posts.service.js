@@ -8,7 +8,7 @@ const repo = require("./posts.repository");
 const likesRepo = require("../likes/likes.repository");
 const feedCache = require("../../cache/feedCache");
 
-function toPostView(post, viewerId, likedByMe) {
+function toPostView(post, viewerId, likedByMe, likePreview = []) {
   return {
     id: post.id,
     text: post.text,
@@ -20,23 +20,20 @@ function toPostView(post, viewerId, likedByMe) {
     author: post.author,
     likedByMe: Boolean(likedByMe),
     isOwner: post.authorId === viewerId,
+    // Up to 3 recent likers for the stacked reactor avatars (who-liked preview).
+    likePreview,
   };
 }
 
-/**
- * A user-submitted imageUrl must be a URL we produced (Cloudinary, our cloud).
- * This blocks embedding arbitrary/SSRF URLs via the create/update body. Seed
- * images bypass this because they are written server-side, not via this path.
- */
 function assertValidImageUrl(imageUrl) {
   if (imageUrl == null) return;
-  if (!env.cloudinaryConfigured) {
-    throw ApiError.badRequest("Image uploads are not enabled on this server", {
-      code: "UPLOADS_DISABLED",
-    });
+  const allowedPrefixes = [`${env.PUBLIC_BACKEND_URL}/uploads/`];
+  if (env.cloudinaryConfigured) {
+    allowedPrefixes.push(
+      `https://res.cloudinary.com/${env.CLOUDINARY_CLOUD_NAME}/`
+    );
   }
-  const prefix = `https://res.cloudinary.com/${env.CLOUDINARY_CLOUD_NAME}/`;
-  if (!imageUrl.startsWith(prefix)) {
+  if (!allowedPrefixes.some((prefix) => imageUrl.startsWith(prefix))) {
     throw ApiError.badRequest("Image URL is not from an allowed source", {
       code: "INVALID_IMAGE_URL",
     });
@@ -76,12 +73,15 @@ async function getFeedPage({ viewerId, cursorRaw, limit }) {
   const hasMore = rows.length > limit;
   const items = hasMore ? rows.slice(0, limit) : rows;
 
-  const likedSet = await likesRepo.likedPostIds(
-    viewerId,
-    items.map((p) => p.id)
-  );
+  const ids = items.map((p) => p.id);
+  const [likedSet, previews] = await Promise.all([
+    likesRepo.likedPostIds(viewerId, ids),
+    likesRepo.likersPreview({ targetType: "POST", targetIds: ids }),
+  ]);
 
-  const viewItems = items.map((p) => toPostView(p, viewerId, likedSet.has(p.id)));
+  const viewItems = items.map((p) =>
+    toPostView(p, viewerId, likedSet.has(p.id), previews.get(p.id) ?? [])
+  );
   const nextCursor = hasMore
     ? encodeCursor(items[items.length - 1])
     : null;
@@ -97,8 +97,11 @@ async function getPostById({ viewerId, id }) {
   if (!post || (post.visibility === "PRIVATE" && post.authorId !== viewerId)) {
     throw ApiError.notFound("Post not found");
   }
-  const liked = await likesRepo.isLiked(viewerId, "POST", id);
-  return toPostView(post, viewerId, liked);
+  const [liked, previews] = await Promise.all([
+    likesRepo.isLiked(viewerId, "POST", id),
+    likesRepo.likersPreview({ targetType: "POST", targetIds: [id] }),
+  ]);
+  return toPostView(post, viewerId, liked, previews.get(id) ?? []);
 }
 
 async function updatePost({ viewerId, resource, data }) {
@@ -127,8 +130,11 @@ async function updatePost({ viewerId, resource, data }) {
   if (resource.visibility === "PUBLIC" && update.visibility === "PRIVATE") {
     await feedCache.bumpGeneration();
   }
-  const liked = await likesRepo.isLiked(viewerId, "POST", resource.id);
-  return toPostView(post, viewerId, liked);
+  const [liked, previews] = await Promise.all([
+    likesRepo.isLiked(viewerId, "POST", resource.id),
+    likesRepo.likersPreview({ targetType: "POST", targetIds: [resource.id] }),
+  ]);
+  return toPostView(post, viewerId, liked, previews.get(resource.id) ?? []);
 }
 
 async function deletePost({ viewerId, resource }) {

@@ -1,13 +1,5 @@
 "use strict";
 
-/**
- * Comments repository. Replies are Comment rows with a non-null parentId
- * (one level deep — a reply's parent is always a top-level comment). Create and
- * delete keep the post's denormalized commentsCount in sync inside a transaction;
- * delete also removes the comment's (and its replies') orphan Like rows, since
- * Like has no FK to Comment (it's polymorphic).
- */
-
 const { prisma } = require("../../config/prisma");
 const { userSummarySelect } = require("../../utils/selects");
 
@@ -71,11 +63,6 @@ module.exports = {
     return prisma.comment.update({ where: { id }, data, select: commentSelect });
   },
 
-  /**
-   * Delete a comment (and, for a top-level comment, its cascade-deleted replies),
-   * clean up orphan Like rows, and decrement the post's commentsCount by the
-   * exact number of comment rows removed. All atomic.
-   */
   remove({ id, postId, parentId }) {
     return prisma.$transaction(async (tx) => {
       let removedCount = 1;

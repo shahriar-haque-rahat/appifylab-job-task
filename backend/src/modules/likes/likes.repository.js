@@ -1,13 +1,6 @@
 "use strict";
 
-/**
- * Likes repository. Like/unlike mutate the row AND the denormalized counter
- * inside a single transaction, so counts never drift and never go negative.
- * `createMany({ skipDuplicates })` / `deleteMany` return an affected-row count,
- * which makes the operation idempotent and race-safe against the unique index
- * (userId, targetType, targetId) — no P2002 handling needed.
- */
-
+const { Prisma } = require("@prisma/client");
 const { prisma } = require("../../config/prisma");
 const { userSummarySelect } = require("../../utils/selects");
 
@@ -89,6 +82,44 @@ module.exports = {
             });
       return { liked: false, changed: count > 0, likesCount: target?.likesCount ?? 0 };
     });
+  },
+
+  async likersPreview({ targetType, targetIds, perTarget = 3 }) {
+    const preview = new Map();
+    if (!targetIds || targetIds.length === 0) return preview;
+
+    // targetId cast to text so the uuid[] binding matches string ids cleanly.
+    const rows = await prisma.$queryRaw(Prisma.sql`
+      SELECT t."targetId" AS "targetId", t."userId" AS "userId"
+      FROM (
+        SELECT l."targetId", l."userId",
+               ROW_NUMBER() OVER (
+                 PARTITION BY l."targetId"
+                 ORDER BY l."createdAt" DESC, l."id" DESC
+               ) AS rn
+        FROM "likes" l
+        WHERE l."targetType"::text = ${targetType}
+          AND l."targetId"::text IN (${Prisma.join(targetIds)})
+      ) t
+      WHERE t.rn <= ${perTarget}
+      ORDER BY t."targetId", t.rn
+    `);
+    if (rows.length === 0) return preview;
+
+    const userIds = [...new Set(rows.map((r) => r.userId))];
+    const users = await prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: userSummarySelect,
+    });
+    const userById = new Map(users.map((u) => [u.id, u]));
+
+    for (const r of rows) {
+      const user = userById.get(r.userId);
+      if (!user) continue;
+      if (!preview.has(r.targetId)) preview.set(r.targetId, []);
+      preview.get(r.targetId).push(user);
+    }
+    return preview;
   },
 
   /** Keyset-paginated list of users who liked a target (newest first). */

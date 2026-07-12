@@ -1,12 +1,5 @@
 "use strict";
 
-/**
- * Posts repository — all post queries live here, including the visibility filter,
- * which is applied INSIDE the query (`visibility = 'PUBLIC' OR authorId = viewer`),
- * never as a post-fetch filter in JS. This is the single source of the feed's
- * privacy rule.
- */
-
 const { prisma } = require("../../config/prisma");
 const { userSummarySelect } = require("../../utils/selects");
 
@@ -75,11 +68,6 @@ module.exports = {
     });
   },
 
-  /**
-   * Combined, visibility-filtered feed page. Keyset pagination ordered
-   * (createdAt DESC, id DESC). `take` should be pageSize + 1 to detect a next page.
-   * @param {{ viewerId: string, cursor: {createdAt: Date, id: string}|null, take: number }} args
-   */
   findFeedPage({ viewerId, cursor, take }) {
     const where = cursor
       ? {

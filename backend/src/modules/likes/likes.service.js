@@ -9,11 +9,6 @@ const feedCache = require("../../cache/feedCache");
 
 const TYPE = { post: "POST", comment: "COMMENT" };
 
-/**
- * You can only interact with a target you're allowed to see. A private post (and
- * comments on it) is invisible to everyone but its author — 404 (not 403) so we
- * never reveal that it exists.
- */
 async function assertTargetVisible(viewerId, targetType, targetId) {
   if (targetType === "POST") {
     const post = await postsRepo.findOwnership(targetId);

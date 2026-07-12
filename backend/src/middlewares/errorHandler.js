@@ -1,11 +1,5 @@
 "use strict";
 
-/**
- * Central error handler. Translates ApiError, Prisma errors, multer errors and
- * unexpected throwables into a consistent `{ error: { message, code, details } }`
- * JSON shape. Server errors (5xx) are logged; their messages are never leaked.
- */
-
 const { Prisma } = require("@prisma/client");
 const { ApiError } = require("../utils/ApiError");
 const { env } = require("../config/env");

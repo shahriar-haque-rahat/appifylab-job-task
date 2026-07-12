@@ -8,7 +8,7 @@ const postsRepo = require("../posts/posts.repository");
 const likesRepo = require("../likes/likes.repository");
 const feedCache = require("../../cache/feedCache");
 
-function toCommentView(comment, viewerId, likedByMe) {
+function toCommentView(comment, viewerId, likedByMe, likePreview = []) {
   return {
     id: comment.id,
     postId: comment.postId,
@@ -20,6 +20,8 @@ function toCommentView(comment, viewerId, likedByMe) {
     author: comment.author,
     likedByMe: Boolean(likedByMe),
     isOwner: comment.authorId === viewerId,
+    // Up to 3 recent likers for the stacked reactor avatars (who-liked preview).
+    likePreview,
   };
 }
 
@@ -34,12 +36,13 @@ async function assertPostVisible(viewerId, postId) {
 async function buildPage(rows, viewerId, limit) {
   const hasMore = rows.length > limit;
   const items = hasMore ? rows.slice(0, limit) : rows;
-  const likedSet = await likesRepo.likedCommentIds(
-    viewerId,
-    items.map((c) => c.id)
-  );
+  const ids = items.map((c) => c.id);
+  const [likedSet, previews] = await Promise.all([
+    likesRepo.likedCommentIds(viewerId, ids),
+    likesRepo.likersPreview({ targetType: "COMMENT", targetIds: ids }),
+  ]);
   const viewItems = items.map((c) =>
-    toCommentView(c, viewerId, likedSet.has(c.id))
+    toCommentView(c, viewerId, likedSet.has(c.id), previews.get(c.id) ?? [])
   );
   const nextCursor = hasMore ? encodeCursor(items[items.length - 1]) : null;
   return { items: viewItems, nextCursor };
@@ -122,8 +125,11 @@ async function updateComment({ viewerId, resource, data }) {
   const clean = sanitizeText(data.text);
   if (!clean) throw ApiError.badRequest("Comment cannot be empty");
   const comment = await repo.update(resource.id, { text: clean });
-  const liked = await likesRepo.isLiked(viewerId, "COMMENT", resource.id);
-  return toCommentView(comment, viewerId, liked);
+  const [liked, previews] = await Promise.all([
+    likesRepo.isLiked(viewerId, "COMMENT", resource.id),
+    likesRepo.likersPreview({ targetType: "COMMENT", targetIds: [resource.id] }),
+  ]);
+  return toCommentView(comment, viewerId, liked, previews.get(resource.id) ?? []);
 }
 
 async function deleteComment({ viewerId, resource }) {
