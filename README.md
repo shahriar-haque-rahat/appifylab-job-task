@@ -37,9 +37,12 @@ Everything under the brief's **Feed → Required functionalities** is implemente
 | 5 | **Who liked** a post / comment / reply | `LikeAvatarStack` → `GET /likes/:type/:id` |
 | 6 | **Private** (author-only) & **Public** posts | visibility filtered **inside the query** |
 
-Plus: secure register/login, protected feed with server-side redirect, token refresh + immediate
+Plus: secure register/login, **Google sign-in** (Google Identity Services → an app-issued JWT
+session, no parallel auth system), protected feed with server-side redirect, token refresh + immediate
 logout, per-route rate limiting, cursor-based infinite scroll, and edit/delete of your own posts &
-comments (ownership enforced server-side).
+comments (ownership enforced server-side). Every mutating interaction — like/unlike (post, comment,
+reply), comment/reply create, edit, delete, and post create/edit/delete — is **optimistic** (the UI
+updates instantly, then reconciles or rolls back with a non-blocking toast on failure).
 
 ---
 
@@ -61,7 +64,7 @@ appifylab-job-task/
 │       ├── app.js           # helmet, cors, cookies, static seed images, error handling
 │       └── server.js
 ├── frontend/                # Next.js App Router
-│   ├── app/                 # layout, globals, /login /register /feed, styles/ (provided CSS)
+│   ├── app/                 # layout, /login /register /feed, and globals.css (single stylesheet)
 │   ├── components/          # ui/ · auth/ · layout/ · feed/ · icons
 │   ├── store/               # RTK store, authSlice, api/ (RTK Query endpoints)
 │   ├── lib/                 # types, config, apiError, format, auth-cookies
@@ -101,9 +104,11 @@ npm run seed                  # demo users, posts, comments, replies, likes
 npm run dev                   # http://localhost:8000  (health: /api/health)
 ```
 
-Cloudinary is **optional** — leave the three `CLOUDINARY_*` vars blank and the app runs fine; only
-live image uploads are disabled (text posts still work, seed images still show). To enable uploads,
-fill them from a free [Cloudinary](https://cloudinary.com) account.
+Cloudinary is **optional** — leave the three `CLOUDINARY_*` vars blank and image upload still works
+via a built-in **local-disk fallback** (files are written to `backend/uploads/` and served at
+`/uploads/*`). Fill the vars from a free [Cloudinary](https://cloudinary.com) account to store uploads
+in Cloudinary instead — recommended before deploying to an ephemeral host (Render/Railway), where
+local disk does not persist across restarts.
 
 ### 3) Frontend
 
@@ -123,10 +128,31 @@ Open **http://localhost:3000**, register a new account, or log in with a demo ac
 Both apps ship a committed `.env.example`. Key variables:
 
 **backend/.env** — `DATABASE_URL`, `DATABASE_URL`, `REDIS_URL`, `JWT_ACCESS_SECRET` (≥32 chars),
-`CORS_ORIGIN` (frontend URL), optional `CLOUDINARY_*`, `PUBLIC_BACKEND_URL` (used to build seed
-image URLs), and cookie tuning (`COOKIE_SAMESITE`, `COOKIE_SECURE`, `TRUST_PROXY`).
+`CORS_ORIGIN` (frontend URL), optional `CLOUDINARY_*`, optional `GOOGLE_CLIENT_ID` (enables Google
+sign-in), `PUBLIC_BACKEND_URL` (used to build seed image URLs), and cookie tuning
+(`COOKIE_SAMESITE`, `COOKIE_SECURE`, `TRUST_PROXY`).
 
-**frontend/.env.local** — `NEXT_PUBLIC_API_URL` (the backend URL **including** `/api`).
+**frontend/.env.local** — `NEXT_PUBLIC_API_URL` (the backend URL **including** `/api`) and optional
+`NEXT_PUBLIC_GOOGLE_CLIENT_ID` (same value as the backend `GOOGLE_CLIENT_ID`).
+
+### Google Sign-In setup (optional)
+
+Google sign-in is off until you supply an OAuth client id (email/password works regardless). To enable it:
+
+1. In the [Google Cloud console](https://console.cloud.google.com) → **APIs & Services → Credentials**,
+   create an **OAuth client ID** of type **Web application**.
+2. Under **Authorized JavaScript origins** add your frontend origin (e.g. `http://localhost:3000`, and
+   your deployed URL). No redirect URI is needed — this uses the Google Identity Services **ID-token**
+   flow, not a redirect/code flow.
+3. Put the client id in **both** `backend/.env` (`GOOGLE_CLIENT_ID`) and `frontend/.env.local`
+   (`NEXT_PUBLIC_GOOGLE_CLIENT_ID`). No client **secret** is required.
+
+**How it works:** the browser gets a signed Google **ID token**, POSTs it to `/api/auth/google`; the
+backend verifies its signature + audience with `google-auth-library`, links it to an existing account
+by verified email (or provisions a new one with an unusable password hash), then issues **our own**
+session (the same JWT access + rotating refresh + CSRF as email/password login). So Google users flow
+through the exact same `authenticate` middleware and protected routes — there is **no** second auth
+system.
 
 Cookie defaults are environment-aware: **dev** uses `SameSite=Lax; Secure=false` (same-site
 `localhost`); **prod** uses `SameSite=None; Secure=true` so the Vercel↔Render cross-domain cookie
@@ -202,9 +228,18 @@ you cannot comment on / like / list likers of a post you can't see.
 Per the plan's two options, this project uses a **hybrid, documented** approach:
 - **Seed images → served locally** by the API at `/seed-assets/images/*` (option **b**). This means
   the demo feed is fully populated **without needing a Cloudinary account**.
-- **Live uploads → Cloudinary** (option **a**). The client sends the file to `POST /uploads/image`;
-  the server validates mime/size and streams it to Cloudinary. Post creation only accepts image URLs
-  from **our** Cloudinary cloud (no arbitrary/SSRF URLs).
+- **Live uploads → Cloudinary when configured, else local disk.** The client sends the file to
+  `POST /uploads/image`; the server validates mime/size and either streams it to Cloudinary (option
+  **a**, when `CLOUDINARY_*` is set) **or** writes it to `backend/uploads/` with a random UUID name
+  and returns a `${PUBLIC_BACKEND_URL}/uploads/<file>` URL served statically. The local-disk fallback
+  keeps the required "create post with image" feature working end-to-end with **zero external setup**;
+  Cloudinary is the durable path for production. Post creation only accepts image URLs from an
+  **allow-list** of our own hosts (our Cloudinary cloud and/or our `/uploads/` origin) — never
+  arbitrary/SSRF URLs.
+- **Delivery sharpness:** Cloudinary URLs are rendered through a `c_limit,w_,dpr_2.0,f_auto,q_auto:good`
+  transform (`lib/img.ts`) so images are served right-sized and crisp (never upscaled); local/seed
+  images are served at full resolution. Post images also have an `onError` fallback so a broken URL
+  shows a clean empty state rather than a broken-image icon.
 
 ---
 
@@ -215,6 +250,7 @@ All under `/api`, all (except auth) require the access cookie; mutations require
 | Method | Path | Purpose |
 |---|---|---|
 | POST | `/auth/register` · `/auth/login` | create session (sets cookies) |
+| POST | `/auth/google` | verify a Google ID token, create/link account, issue our session |
 | POST | `/auth/refresh` · `/auth/logout` | rotate / end session |
 | GET | `/users/me` · `/users/:id` | current user / public profile |
 | GET | `/posts?cursor=&limit=` | visibility-filtered feed page |
@@ -259,20 +295,55 @@ All under `/api`, all (except auth) require the access cookie; mutations require
 
 ## Design deviations
 
-The provided template is reused verbatim (its `bootstrap/common/main/responsive.css`, fonts, images,
-and class names). Only the following minimal, brief-required additions were made — no existing element
-was restyled:
+The provided template's **markup and class names** are reused verbatim (fonts, images, and the
+original `_`-prefixed class names). The four legacy stylesheets (`bootstrap.min/common/main/responsive.css`)
+were **removed and consolidated into a single `app/globals.css`**: the rules the app actually renders
+were tree-shaken (rules whose selectors reference classes that never appear in the app are dropped —
+they could never match) and merged under an `@layer template` block, with Tailwind's theme + utilities
+layered on top and the app-specific globals on top of that. Net effect is visually identical, one
+stylesheet instead of five. The full `feed.html` shell is reproduced — desktop header (logo, search, home,
+friend-requests, notifications **with dropdown**, messages), the floating **dark/light theme toggle**,
+both the **left** (Explore / Suggested People / Events) and **right** (You Might Like / Your Friends)
+sidebars, and the **mobile** top bar + bottom navigation — all using the original class names so the
+template CSS applies. Only the following minimal, brief-required additions/adaptations were made — no
+existing element was restyled:
 
 1. **Registration:** added **First name / Last name** fields (styled with the existing
    `_social_registration_input` classes).
 2. **Feed composer & post:** added a **Public / Private visibility selector** (the template shows a
-   static "Public" label) — a small dropdown styled in `globals.css`.
-3. **Replies:** the template has no reply-thread visual, so replies reuse the existing comment card
-   styling, indented, via the same recursive `CommentThread`.
-4. Header/nav secondary widgets, story carousel, and right sidebar are intentionally minimal — the
-   brief says to focus on feed functionality. The **Share** button is present for parity but inert.
-5. Icons in the design are inline SVGs; a few (like/comment/share/menu) reuse the template's exact
-   paths, the rest are clean equivalents.
+   static "Public" label) — a small dropdown; the post header shows a lock/globe + Public/Private
+   label instead of the static "Public" anchor.
+3. **Replies:** the template only depicts a reply input, so real one-level reply threading reuses the
+   existing comment card styling, indented, via the same recursive `CommentThread`.
+4. **Theme toggle** toggles the template's shipped `_dark_wrapper` dark theme on `<body>` (persisted
+   to `localStorage`); the original toggles it via `custom.js`, which we don't ship.
+5. **Sidebars & mobile nav** reproduce the template markup as **static** widgets (Suggested People,
+   Events, Your Friends, etc. are decorative placeholders — the brief scopes real functionality to the
+   feed). Decorative links are inert (`href="#"`); the mobile bottom bar wires a real **Log Out**.
+   The **Settings**, **Help & Support**, friend-requests, messages and **Share** controls are present
+   for parity but are no-ops (no such subsystems are in scope). The **notification dropdown** is
+   populated with realistic **seeded sample notifications** (e.g. "X liked your post", "Y commented on
+   your post", "Z replied to your comment") rendered in the template's notification card, with an
+   unread badge on the bell — static demo data, not a live notification subsystem.
+6. **Who-liked:** the reactor-avatar stack (`likePreview`, ≤3 recent likers batched per feed page via
+   a window query) renders the design's `_react_img` row; clicking it opens the full paginated liker
+   list.
+7. Icons in the design are inline SVGs; the prominent ones (home, friend-requests, bell, chat, plus
+   like/comment/share/menu and the theme moon/sun) reuse the template's exact paths, the rest are
+   clean equivalents.
+8. **UX additions** not in the static template: skeleton loaders (feed/comments/replies), a
+   determinate image-upload **progress bar**, and inline form validation. `next.config.ts` sets
+   `devIndicators: false` to hide the dev-only overlay indicator.
+9. **Blanket optimistic UI** (RTK Query `updateQueryData` + rollback): likes/unlikes (post, comment,
+   reply) update the button, count **and** the "who liked" avatar stack instantly; new comments,
+   replies and posts render immediately (temp row swapped for the server row on success); edits and
+   deletes apply instantly. On any API failure the change rolls back and a **non-blocking toast** is
+   shown — no blocking `alert()`/`confirm()` anywhere.
+10. **Post edit / delete** use a styled, theme-aware **modal** (edit) and a destructive **confirm
+    dialog** (delete) consistent with the Tailwind design system, replacing the native dialogs.
+11. **Auth pages**: a working **Google sign-in** button (falls back to a disabled hint when no client
+    id is configured), submit buttons that never wrap their label, and layout tuned to fit the viewport
+    without scrolling on typical screens.
 
 ---
 

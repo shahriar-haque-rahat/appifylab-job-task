@@ -10,6 +10,7 @@ const { env } = require("./config/env");
 const { generalLimiter } = require("./middlewares/rateLimiter");
 const { notFound } = require("./middlewares/notFound");
 const { errorHandler } = require("./middlewares/errorHandler");
+const { UPLOADS_DIR, ensureUploadsDir } = require("./config/cloudinary");
 const apiRouter = require("./routes");
 
 const app = express();
@@ -47,6 +48,14 @@ app.use(
     immutable: true,
     fallthrough: true,
   })
+);
+
+// User-uploaded images when Cloudinary is not configured (local-disk fallback).
+// The dir is created at startup so the static mount and the writer agree on it.
+ensureUploadsDir();
+app.use(
+  "/uploads",
+  express.static(UPLOADS_DIR, { maxAge: "7d", fallthrough: true })
 );
 
 // General per-IP rate limit across the whole API.

@@ -10,5 +10,9 @@ dist/
 .vercel
 coverage/
 
+# Local-disk image uploads (Cloudinary fallback) — user content, never committed.
+# Anchored to the backend root so it does NOT match src/modules/uploads/.
+/uploads/
+
 # Prisma generated client (regenerated via `npm run prisma:generate`)
 src/generated/
