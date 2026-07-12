@@ -1,11 +1,5 @@
 "use strict";
 
-/**
- * Verifies the short-lived access-token JWT from the httpOnly cookie and sets
- * `req.user = { id }`. This is the real authorization boundary — every protected
- * route runs through it, regardless of what the frontend does.
- */
-
 const { verifyAccessToken } = require("../utils/tokens");
 const { ACCESS_COOKIE } = require("../utils/cookies");
 const { ApiError } = require("../utils/ApiError");

@@ -33,4 +33,15 @@ const loginSchema = {
   }),
 };
 
-module.exports = { registerSchema, loginSchema };
+// The `credential` is the Google ID token (a JWT) returned by Google Identity
+// Services. Bounded length; fully verified (signature + audience) in the service.
+const googleSchema = {
+  body: z.object({
+    credential: z
+      .string()
+      .min(1, "A Google credential is required")
+      .max(4096, "Invalid Google credential"),
+  }),
+};
+
+module.exports = { registerSchema, loginSchema, googleSchema };

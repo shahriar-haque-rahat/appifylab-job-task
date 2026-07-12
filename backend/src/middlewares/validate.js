@@ -1,13 +1,5 @@
 "use strict";
 
-/**
- * Zod validation middleware. Validates body/query/params against the supplied
- * schemas and exposes the PARSED (whitelisted) values on `req.valid`. Because
- * zod object schemas strip unknown keys, any client-supplied fields we don't
- * explicitly accept (e.g. id, authorId, likesCount) are dropped here — this is
- * the first line of the "server-generated only" guarantee.
- */
-
 const { z } = require("zod");
 const { ApiError } = require("../utils/ApiError");
 

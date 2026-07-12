@@ -1,10 +1,5 @@
 "use strict";
 
-/**
- * Auth repository — the ONLY place auth-related Prisma queries live.
- * Handles the users table and the refresh_tokens durability/audit table.
- */
-
 const { prisma } = require("../../config/prisma");
 const { userPublicSelect, toPublicUser } = require("../../utils/selects");
 
@@ -19,6 +14,9 @@ module.exports = {
   },
   findPublicUserById(id) {
     return prisma.user.findUnique({ where: { id }, select: userPublicSelect });
+  },
+  findPublicUserByEmail(email) {
+    return prisma.user.findUnique({ where: { email }, select: userPublicSelect });
   },
   createUser(data) {
     return prisma.user.create({ data, select: userPublicSelect });
