@@ -1,14 +1,5 @@
 "use strict";
 
-/**
- * Post/comment bodies are plain text. We run every user-supplied string through
- * sanitize-html with an empty allow-list, which discards ALL tags (so no markup,
- * scripts, or event handlers can be stored), then decode the handful of HTML
- * entities sanitize-html emits so the stored value is the user's literal text.
- * The frontend renders it as a React text node (escaped again at render), giving
- * defence-in-depth against stored XSS.
- */
-
 const sanitizeHtml = require("sanitize-html");
 
 function decodeBasicEntities(str) {

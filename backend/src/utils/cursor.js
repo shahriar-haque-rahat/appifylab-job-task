@@ -1,11 +1,5 @@
 "use strict";
 
-/**
- * Opaque keyset cursor = base64url("<ISO createdAt>|<uuid id>").
- * Keyset (not OFFSET) pagination so page depth doesn't degrade at scale.
- * The id tiebreaker makes ordering total even when createdAt collides.
- */
-
 function encodeCursor({ createdAt, id }) {
   const ts = createdAt instanceof Date ? createdAt.toISOString() : String(createdAt);
   return Buffer.from(`${ts}|${id}`).toString("base64url");

@@ -1,13 +1,5 @@
 "use strict";
 
-/**
- * Token helpers.
- *  - Access token: short-lived signed JWT (HS256), subject = userId.
- *  - Refresh token: opaque random string of the form `<jti>.<secret>`. Only its
- *    SHA-256 hash is ever persisted (Redis + Postgres); the raw value lives only
- *    in the httpOnly cookie on the client.
- */
-
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const { env } = require("../config/env");

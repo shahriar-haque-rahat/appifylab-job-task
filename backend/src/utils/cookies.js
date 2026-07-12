@@ -1,14 +1,5 @@
 "use strict";
 
-/**
- * Cookie helpers. Three cookies are used:
- *  - access_token  : httpOnly JWT, sent to all /api routes.
- *  - refresh_token : httpOnly opaque token, PATH-SCOPED to /api/auth so it is
- *                    only ever transmitted to refresh/logout (least exposure).
- *  - csrf_token    : readable by JS (double-submit); the client echoes it back
- *                    in the x-csrf-token header on state-changing requests.
- */
-
 const { env } = require("../config/env");
 const { refreshTtlSeconds } = require("./tokens");
 

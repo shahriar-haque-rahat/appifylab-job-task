@@ -1,10 +1,5 @@
 "use strict";
 
-/**
- * Operational error with an HTTP status. Thrown by services/controllers and
- * translated into a JSON response by the errorHandler middleware. `expose`
- * marks the message as safe to return to the client.
- */
 class ApiError extends Error {
   constructor(statusCode, message, options = {}) {
     super(message);
