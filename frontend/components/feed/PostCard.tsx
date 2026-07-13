@@ -126,7 +126,7 @@ export function PostCard({ post }: { post: Post }) {
                   <li className="_feed_timeline_dropdown_item">
                     <button
                       type="button"
-                      className="_feed_timeline_dropdown_link"
+                      className="_feed_timeline_dropdown_link bg-transparent"
                       onClick={() => {
                         close();
                         openEdit();
@@ -141,7 +141,7 @@ export function PostCard({ post }: { post: Post }) {
                   <li className="_feed_timeline_dropdown_item">
                     <button
                       type="button"
-                      className="_feed_timeline_dropdown_link"
+                      className="_feed_timeline_dropdown_link bg-transparent"
                       onClick={() => {
                         close();
                         setConfirmingDelete(true);
@@ -242,7 +242,7 @@ export function PostCard({ post }: { post: Post }) {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              className="cursor-pointer rounded-lg border border-line bg-transparent px-4 py-2 text-[14px] font-medium text-ink hover:bg-surface-2 disabled:opacity-60"
+              className="cursor-pointer whitespace-nowrap rounded-lg border-0 bg-transparent px-4 py-2 text-[13px] font-medium text-ink hover:bg-surface-2 disabled:opacity-60"
               onClick={() => setEditing(false)}
               disabled={saving}
             >
@@ -250,7 +250,7 @@ export function PostCard({ post }: { post: Post }) {
             </button>
             <button
               type="button"
-              className="cursor-pointer rounded-lg border-0 bg-primary px-5 py-2 text-[14px] font-semibold text-white hover:bg-primary-hover disabled:opacity-60"
+              className="cursor-pointer whitespace-nowrap rounded-lg border-0 bg-primary px-5 py-2 text-[13px] font-semibold text-white hover:bg-primary-hover disabled:opacity-60"
               onClick={saveEdit}
               disabled={saving}
             >
