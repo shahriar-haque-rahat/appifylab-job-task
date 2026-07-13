@@ -1,32 +1,48 @@
 "use strict";
 
 const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
 const bcrypt = require("bcrypt");
 const { env } = require("../src/config/env");
 const { prisma } = require("../src/config/prisma");
 
-const img = (name) => `${env.PUBLIC_BACKEND_URL}/seed-assets/images/${name}`;
+const publicBackendUrl = env.PUBLIC_BACKEND_URL.replace(/\/+$/, "");
+const img = (name) => `${publicBackendUrl}/seed-assets/images/${name}`;
 const minutesAgo = (m) => new Date(Date.now() - m * 60 * 1000);
 const uuid = () => crypto.randomUUID();
+const SEED_IMAGES_DIR = path.join(__dirname, "..", "seed-assets", "images");
 
-// 8 users, each with a DISTINCT avatar so the feed doesn't visually look
-// like one person under different names.
+// Keep avatars separate from user metadata so assignment is deterministic by
+// user index and can be validated before the destructive reset begins. These
+// are consistently sized portraits rather than post/content thumbnails.
+const AVATAR_IMAGES = [
+  "f1.png",
+  "f2.png",
+  "f3.png",
+  "f4.png",
+  "f5.png",
+  "f6.png",
+  "f7.png",
+  "f8.png",
+];
+
 const USERS = [
-  { key: "dylan", firstName: "Dylan", lastName: "Field", email: "dylan@demo.test", avatar: "profile.png" },
-  { key: "karim", firstName: "Karim", lastName: "Saif", email: "karim@demo.test", avatar: "post_img.png" },
-  { key: "radovan", firstName: "Radovan", lastName: "Novak", email: "radovan@demo.test", avatar: "txt_img.png" },
-  { key: "ayesha", firstName: "Ayesha", lastName: "Khan", email: "ayesha@demo.test", avatar: "people1.png" },
-  { key: "marcus", firstName: "Marcus", lastName: "Lee", email: "marcus@demo.test", avatar: "man.png" },
-  { key: "priya", firstName: "Priya", lastName: "Sharma", email: "priya@demo.test", avatar: "people2.png" },
-  { key: "taro", firstName: "Taro", lastName: "Yamamoto", email: "taro@demo.test", avatar: "people3.png" },
-  { key: "elena", firstName: "Elena", lastName: "Petrova", email: "elena@demo.test", avatar: "f1.png" },
+  { key: "dylan", firstName: "Dylan", lastName: "Field", email: "dylan@demo.test" },
+  { key: "karim", firstName: "Karim", lastName: "Saif", email: "karim@demo.test" },
+  { key: "radovan", firstName: "Radovan", lastName: "Novak", email: "radovan@demo.test" },
+  { key: "ayesha", firstName: "Ayesha", lastName: "Khan", email: "ayesha@demo.test" },
+  { key: "marcus", firstName: "Marcus", lastName: "Lee", email: "marcus@demo.test" },
+  { key: "priya", firstName: "Priya", lastName: "Sharma", email: "priya@demo.test" },
+  { key: "taro", firstName: "Taro", lastName: "Yamamoto", email: "taro@demo.test" },
+  { key: "elena", firstName: "Elena", lastName: "Petrova", email: "elena@demo.test" },
 ];
 
 const POST_IMAGES = [
   "img1.png", "img2.png", "img3.png", "img4.png", "img5.png",
   "img6.png", "img7.png", "img8.png", "img9.png", "img10.png",
   "img11.png", "img12.png", "photos1.png", "photos2.png", "photos3.png",
-  "photos4.png", "photos5.png", "photos6.png", "photos7.png", "photos8.png",
+  "photos5.png", "photos6.png", "photos7.png", "photos8.png",
   "photos9.png", "slider1.png", "slider2.png", "slider3.png", "slider4.png",
   "timeline_img.png", "feed_event1.png", "chat_img.png", "chat1_img.png", "chat2_img.png",
   "chat3_img.png", "chat4_img.png", "chat5_img.png", "chat6_img.png", "chat7_img.png",
@@ -98,18 +114,24 @@ const TOPICS = [
 // 55 posts spread across users with varied images and engagement
 const POSTS = [];
 const userKeys = USERS.map((u) => u.key);
+let postImageIndex = 0;
 
 for (let i = 0; i < 55; i++) {
-  const author = pick(userKeys);
+  // Cycling authors guarantees that the newest feed page demonstrates the
+  // distinct seeded avatars instead of relying on random author selection.
+  const author = userKeys[i % userKeys.length];
   const age = 3 + i * 8; // spread across 3 min to ~440 min (~7 hours)
   const visibility = i % 7 === 3 ? "PRIVATE" : "PUBLIC"; // ~1 in 7 private
   const hasImage = i % 3 !== 1; // 2/3 have images
+  const image = hasImage
+    ? POST_IMAGES[postImageIndex++ % POST_IMAGES.length]
+    : null;
   const post = {
     author,
     age,
     visibility,
     text: TOPICS[i % TOPICS.length],
-    image: hasImage ? pick(POST_IMAGES) : null,
+    image,
     likes: [],
     comments: [],
   };
@@ -171,6 +193,99 @@ for (let i = 0; i < 55; i++) {
   POSTS.push(post);
 }
 
+function assetHash(name) {
+  return crypto
+    .createHash("sha256")
+    .update(fs.readFileSync(path.join(SEED_IMAGES_DIR, name)))
+    .digest("hex");
+}
+
+function validateSeedPlan() {
+  if (AVATAR_IMAGES.length < USERS.length) {
+    throw new Error(
+      `Need at least ${USERS.length} avatar images; found ${AVATAR_IMAGES.length}`
+    );
+  }
+
+  const assignedAvatars = AVATAR_IMAGES.slice(0, USERS.length);
+  if (new Set(assignedAvatars).size !== USERS.length) {
+    throw new Error("Each seeded user must be assigned a unique avatar filename");
+  }
+
+  const referencedImages = [...new Set([...assignedAvatars, ...POST_IMAGES])];
+  const missingImages = referencedImages.filter(
+    (name) => !fs.existsSync(path.join(SEED_IMAGES_DIR, name))
+  );
+  if (missingImages.length) {
+    throw new Error(`Missing seed image assets: ${missingImages.join(", ")}`);
+  }
+
+  // Different filenames can still contain identical image bytes (for example,
+  // Avatar.png and man.png in the supplied assets), so validate file contents.
+  const avatarHashes = assignedAvatars.map(assetHash);
+  if (new Set(avatarHashes).size !== USERS.length) {
+    throw new Error("Each seeded user must be assigned a distinct avatar image");
+  }
+
+  const assignedPostImages = POSTS.map((post) => post.image).filter(Boolean);
+  const expectedPostImageVariety = Math.min(
+    assignedPostImages.length,
+    POST_IMAGES.length
+  );
+  if (new Set(assignedPostImages).size !== expectedPostImageVariety) {
+    throw new Error("Seeded post images are not cycling through the full image set");
+  }
+  if (new Set(assignedPostImages.map(assetHash)).size !== expectedPostImageVariety) {
+    throw new Error("Seeded posts must use distinct image assets, not duplicate files");
+  }
+
+  console.log(
+    `[seed] validated ${USERS.length} distinct avatars and ` +
+    `${expectedPostImageVariety} distinct post images`
+  );
+}
+
+function isLoopbackHostname(hostname) {
+  return ["localhost", "127.0.0.1", "::1"].includes(hostname);
+}
+
+function validateSeedTarget({ warnOnly = false } = {}) {
+  let databaseUrl;
+  let assetBaseUrl;
+
+  try {
+    databaseUrl = new URL(env.DATABASE_URL);
+    assetBaseUrl = new URL(publicBackendUrl);
+  } catch {
+    throw new Error("DATABASE_URL and PUBLIC_BACKEND_URL must both be valid URLs");
+  }
+
+  const writesToRemoteDatabase = !isLoopbackHostname(databaseUrl.hostname);
+  const writesLoopbackAssetUrls = isLoopbackHostname(assetBaseUrl.hostname);
+
+  // Allow local development with a remote database (e.g. Neon).
+  if (!env.isProd) {
+    return;
+  }
+
+  if (!writesToRemoteDatabase || !writesLoopbackAssetUrls) {
+    return;
+  }
+
+  const message =
+    "Remote database is paired with a loopback PUBLIC_BACKEND_URL; seeded " +
+    "images would fail outside this machine and every avatar would fall back " +
+    "to the same default. Set PUBLIC_BACKEND_URL to the deployed API origin.";
+
+  // Validation-only mode remains useful for checking the seed data locally,
+  // but an actual destructive seed refuses this unsafe target combination.
+  if (warnOnly) {
+    console.warn(`[seed] warning: ${message}`);
+    return;
+  }
+  throw new Error(message);
+}
+
 async function reset() {
   await prisma.like.deleteMany();
   await prisma.comment.deleteMany();
@@ -180,6 +295,24 @@ async function reset() {
 }
 
 async function main() {
+  // This runs before reset() so a bad/missing image plan can never wipe data.
+  validateSeedPlan();
+
+  const validateOnly = process.argv.includes("--validate-only");
+  const validateTargetOnly = process.argv.includes("--validate-target-only");
+
+  if (validateOnly) {
+    validateSeedTarget({ warnOnly: true });
+    console.log("[seed] validation-only mode; database was not modified");
+    return;
+  }
+
+  validateSeedTarget();
+  if (validateTargetOnly) {
+    console.log("[seed] target validation passed; database was not modified");
+    return;
+  }
+
   console.log("[seed] resetting demo data\u2026");
   await reset();
 
@@ -187,14 +320,14 @@ async function main() {
 
   // --- Users ---
   const userByKey = {};
-  for (const u of USERS) {
+  for (const [userIndex, u] of USERS.entries()) {
     const created = await prisma.user.create({
       data: {
         firstName: u.firstName,
         lastName: u.lastName,
         email: u.email,
         passwordHash,
-        avatarUrl: img(u.avatar),
+        avatarUrl: img(AVATAR_IMAGES[userIndex]),
       },
     });
     userByKey[u.key] = created;
