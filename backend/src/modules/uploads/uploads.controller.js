@@ -42,19 +42,19 @@ function createUploadImageHandler(dependencies = {}) {
 
   return async (req, res) => {
     if (!req.file) {
-      console.log("========== FILE ==========");
-      console.log({
+      logger.log("========== FILE ==========");
+      logger.log({
         originalname: req.file.originalname,
         mimetype: req.file.mimetype,
         size: req.file.size,
         bufferLength: req.file.buffer.length,
       });
-      console.log("==========================");
+      logger.log("==========================");
 
       throw ApiError.badRequest("No image file provided", { code: "NO_FILE" });
     }
 
-    console.log({
+    logger.log({
       mimetype: req.file.mimetype,
       size: req.file.size,
       originalname: req.file.originalname,

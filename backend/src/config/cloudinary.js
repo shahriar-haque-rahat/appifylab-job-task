@@ -5,6 +5,7 @@ const path = require("path");
 const crypto = require("crypto");
 const { v2: cloudinary } = require("cloudinary");
 const { env } = require("./env");
+const logger = require("../utils/logger");
 
 // Local disk fallback: when Cloudinary is not configured, uploaded images are
 // written here and served statically from the API at `/uploads/*` (see app.js).
@@ -32,7 +33,7 @@ if (env.cloudinaryConfigured) {
     secure: true,
   });
 }
-console.log({
+logger.log({
   cloud_name: env.CLOUDINARY_CLOUD_NAME,
   api_key: env.CLOUDINARY_API_KEY,
   api_secret_length: env.CLOUDINARY_API_SECRET?.length,
@@ -71,9 +72,9 @@ function uploadImageBuffer(buffer, opts = {}) {
         },
         (error, result) => {
           if (error) {
-            console.error("====== CLOUDINARY UPLOAD ERROR ======");
-            console.error(error);
-            console.error("=====================================");
+            logger.error("====== CLOUDINARY UPLOAD ERROR ======");
+            logger.error(error);
+            logger.error("=====================================");
             return finish(error);
           }
 
@@ -104,7 +105,7 @@ function uploadImageBuffer(buffer, opts = {}) {
         if (stream && typeof stream.destroy === "function") stream.destroy();
       }, timeoutMs);
 
-      console.log("Uploading buffer:", {
+      logger.log("Uploading buffer:", {
         length: buffer.length,
         firstBytes: buffer.subarray(0, 16).toString("hex"),
       });

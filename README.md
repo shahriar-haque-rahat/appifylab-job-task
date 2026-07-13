@@ -110,6 +110,11 @@ via a built-in **local-disk fallback** (files are written to `backend/uploads/` 
 in Cloudinary instead — recommended before deploying to an ephemeral host (Render/Railway), where
 local disk does not persist across restarts.
 
+`UPLOAD_STORAGE=auto` selects Cloudinary only when all three credentials are present. Set it to
+`local` to explicitly use disk in development, or `cloudinary` to require the provider (the API key
+must have permission to create assets). Provider calls are bounded by `UPLOAD_TIMEOUT_MS`; rejected
+or unavailable uploads return the safe `UPLOAD_FAILED` API code without exposing provider details.
+
 ### 3) Frontend
 
 ```bash

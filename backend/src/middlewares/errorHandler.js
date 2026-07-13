@@ -3,6 +3,7 @@
 const { Prisma } = require("@prisma/client");
 const { ApiError } = require("../utils/ApiError");
 const { env } = require("../config/env");
+const logger = require("../utils/logger");
 
 // eslint-disable-next-line no-unused-vars
 function errorHandler(err, req, res, next) {
@@ -35,12 +36,14 @@ function errorHandler(err, req, res, next) {
     code = "DB_VALIDATION";
     message = "Invalid database request";
   } else if (err && err.name === "MulterError") {
-    status = 400;
-    code = "UPLOAD_ERROR";
-    message =
-      err.code === "LIMIT_FILE_SIZE"
-        ? "Image exceeds the maximum allowed size"
-        : "File upload error";
+    const tooLarge = err.code === "LIMIT_FILE_SIZE";
+    status = tooLarge ? 413 : 400;
+    code = tooLarge ? "IMAGE_TOO_LARGE" : "INVALID_UPLOAD";
+    message = tooLarge
+      ? "Image exceeds the maximum allowed size"
+      : err.code === "LIMIT_UNEXPECTED_FILE"
+        ? "Upload exactly one image using the image field"
+        : "Invalid image upload request";
   } else if (err && err.type === "entity.too.large") {
     status = 413;
     code = "PAYLOAD_TOO_LARGE";
@@ -49,7 +52,7 @@ function errorHandler(err, req, res, next) {
 
   if (status >= 500) {
     // eslint-disable-next-line no-console
-    console.error("[error]", err);
+    logger.error("[error]", err);
   }
 
   const body = { error: { message, code } };

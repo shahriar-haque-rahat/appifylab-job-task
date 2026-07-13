@@ -7,6 +7,7 @@ import { PostCard } from "./PostCard";
 import { PostCardSkeleton } from "@/components/ui/Skeleton";
 import { FormError } from "@/components/ui/FormError";
 import { getErrorMessage } from "@/lib/apiError";
+import logger from "@/lib/logger";
 
 export function Feed() {
   const [cursor, setCursor] = useState<string | undefined>(undefined);
@@ -36,7 +37,7 @@ export function Feed() {
     const root = el.closest("._layout_middle_wrap") as HTMLElement | null;
     const obs = new IntersectionObserver(
       (entries) => {
-        console.log("sentinel intersecting:", entries[0]?.isIntersecting);
+        logger.log("sentinel intersecting:", entries[0]?.isIntersecting);
         if (entries[0]?.isIntersecting) loadMore();
       },
       { root, rootMargin: "300px" }
@@ -45,7 +46,7 @@ export function Feed() {
     return () => obs.disconnect();
   }, [loadMore]);
 
-  console.log("nextCursor:", nextCursor, "isFetching:", isFetching, "items:", items.length);
+  logger.log("nextCursor:", nextCursor, "isFetching:", isFetching, "items:", items.length);
 
   return (
     <>

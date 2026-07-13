@@ -6,6 +6,7 @@ const path = require("path");
 const bcrypt = require("bcrypt");
 const { env } = require("../src/config/env");
 const { prisma } = require("../src/config/prisma");
+const logger = require("../src/utils/logger");
 
 const publicBackendUrl = env.PUBLIC_BACKEND_URL.replace(/\/+$/, "");
 const img = (name) => `${publicBackendUrl}/seed-assets/images/${name}`;
@@ -239,7 +240,7 @@ function validateSeedPlan() {
     throw new Error("Seeded posts must use distinct image assets, not duplicate files");
   }
 
-  console.log(
+  logger.log(
     `[seed] validated ${USERS.length} distinct avatars and ` +
     `${expectedPostImageVariety} distinct post images`
   );
@@ -280,7 +281,7 @@ function validateSeedTarget({ warnOnly = false } = {}) {
   // Validation-only mode remains useful for checking the seed data locally,
   // but an actual destructive seed refuses this unsafe target combination.
   if (warnOnly) {
-    console.warn(`[seed] warning: ${message}`);
+    logger.warn(`[seed] warning: ${message}`);
     return;
   }
   throw new Error(message);
@@ -303,17 +304,17 @@ async function main() {
 
   if (validateOnly) {
     validateSeedTarget({ warnOnly: true });
-    console.log("[seed] validation-only mode; database was not modified");
+    logger.log("[seed] validation-only mode; database was not modified");
     return;
   }
 
   validateSeedTarget();
   if (validateTargetOnly) {
-    console.log("[seed] target validation passed; database was not modified");
+    logger.log("[seed] target validation passed; database was not modified");
     return;
   }
 
-  console.log("[seed] resetting demo data\u2026");
+  logger.log("[seed] resetting demo data\u2026");
   await reset();
 
   const passwordHash = await bcrypt.hash("Password123!", env.BCRYPT_COST);
@@ -332,7 +333,7 @@ async function main() {
     });
     userByKey[u.key] = created;
   }
-  console.log(`[seed] created ${USERS.length} users`);
+  logger.log(`[seed] created ${USERS.length} users`);
 
   const likeRows = [];
   let postCount = 0;
@@ -436,17 +437,17 @@ async function main() {
     await prisma.like.createMany({ data: likeRows, skipDuplicates: true });
   }
 
-  console.log(
+  logger.log(
     `[seed] created ${postCount} posts, ${commentCount} comments/replies, ${likeRows.length} likes`
   );
-  console.log("[seed] demo login \u2192 any of:");
-  USERS.forEach((u) => console.log(`         ${u.email}  /  Password123!`));
-  console.log("[seed] done \u2714");
+  logger.log("[seed] demo login \u2192 any of:");
+  USERS.forEach((u) => logger.log(`         ${u.email}  /  Password123!`));
+  logger.log("[seed] done \u2714");
 }
 
 main()
   .catch((err) => {
-    console.error("[seed] failed:", err);
+    logger.error("[seed] failed:", err);
     process.exitCode = 1;
   })
   .finally(async () => {

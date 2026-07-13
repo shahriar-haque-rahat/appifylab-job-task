@@ -5,12 +5,13 @@ const { app } = require("./app");
 const { env } = require("./config/env");
 const { disconnectRedis } = require("./config/redis");
 const { disconnectPrisma } = require("./config/prisma");
+const logger = require("./utils/logger");
 
 const server = http.createServer(app);
 
 server.listen(env.PORT, () => {
   // eslint-disable-next-line no-console
-  console.log(
+  logger.log(
     `[server] listening on http://localhost:${env.PORT} (${env.NODE_ENV})`
   );
 });
@@ -20,7 +21,7 @@ async function shutdown(signal) {
   if (shuttingDown) return;
   shuttingDown = true;
   // eslint-disable-next-line no-console
-  console.log(`[server] ${signal} received — shutting down gracefully`);
+  logger.log(`[server] ${signal} received — shutting down gracefully`);
   server.close(async () => {
     try {
       await disconnectRedis();

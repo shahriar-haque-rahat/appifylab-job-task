@@ -2,6 +2,7 @@
 
 const Redis = require("ioredis");
 const { env } = require("./env");
+const logger = require("../utils/logger");
 
 const redis = new Redis(env.REDIS_URL, {
   // Fail fast rather than buffering commands forever if Redis is unreachable.
@@ -14,7 +15,7 @@ const redis = new Redis(env.REDIS_URL, {
 
 redis.on("error", (err) => {
   // eslint-disable-next-line no-console
-  console.error("[redis] connection error:", err.message);
+  logger.error("[redis] connection error:", err.message);
 });
 
 let announced = false;
@@ -22,7 +23,7 @@ redis.on("ready", () => {
   if (!announced) {
     announced = true;
     // eslint-disable-next-line no-console
-    console.log("[redis] connected");
+    logger.log("[redis] connected");
   }
 });
 

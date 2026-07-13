@@ -2,8 +2,15 @@
 
 require("dotenv").config();
 const { z } = require("zod");
+const logger = require("../utils/logger");
 
 const isProd = process.env.NODE_ENV === "production";
+
+const optionalTrimmedString = z.preprocess(
+  (value) =>
+    typeof value === "string" && value.trim() === "" ? undefined : value,
+  z.string().trim().min(1).optional()
+);
 
 const schema = z
   .object({
@@ -39,9 +46,16 @@ const schema = z
     TRUST_PROXY: z.coerce.number().int().min(0).default(isProd ? 1 : 0),
 
     // --- Cloudinary (optional group — live image uploads disabled if absent) ---
-    CLOUDINARY_CLOUD_NAME: z.string().optional(),
-    CLOUDINARY_API_KEY: z.string().optional(),
-    CLOUDINARY_API_SECRET: z.string().optional(),
+    UPLOAD_STORAGE: z.enum(["auto", "local", "cloudinary"]).default("auto"),
+    UPLOAD_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .min(1_000)
+      .max(60_000)
+      .default(15_000),
+    CLOUDINARY_CLOUD_NAME: optionalTrimmedString,
+    CLOUDINARY_API_KEY: optionalTrimmedString,
+    CLOUDINARY_API_SECRET: optionalTrimmedString,
 
     // --- Google OAuth (optional — "Sign in with Google" disabled if absent) ---
     // The OAuth 2.0 Client ID from the Google Cloud console. Verified server-side
@@ -55,6 +69,35 @@ const schema = z
     FEED_PAGE_SIZE: z.coerce.number().int().min(1).max(50).default(10),
     MAX_IMAGE_BYTES: z.coerce.number().int().positive().default(5 * 1024 * 1024),
   })
+  .superRefine((env, ctx) => {
+    const credentialCount = [
+      env.CLOUDINARY_CLOUD_NAME,
+      env.CLOUDINARY_API_KEY,
+      env.CLOUDINARY_API_SECRET,
+    ].filter(Boolean).length;
+
+    if (
+      env.UPLOAD_STORAGE !== "local" &&
+      credentialCount > 0 &&
+      credentialCount < 3
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["CLOUDINARY_CLOUD_NAME"],
+        message:
+          "Cloudinary credentials must be provided together, or set UPLOAD_STORAGE=local",
+      });
+    }
+
+    if (env.UPLOAD_STORAGE === "cloudinary" && credentialCount !== 3) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["UPLOAD_STORAGE"],
+        message:
+          "UPLOAD_STORAGE=cloudinary requires all three Cloudinary credentials",
+      });
+    }
+  })
   .transform((env) => {
     const cloudinaryConfigured = Boolean(
       env.CLOUDINARY_CLOUD_NAME &&
@@ -62,6 +105,12 @@ const schema = z
         env.CLOUDINARY_API_SECRET
     );
     const googleConfigured = Boolean(env.GOOGLE_CLIENT_ID);
+    const uploadStorage =
+      env.UPLOAD_STORAGE === "auto"
+        ? cloudinaryConfigured
+          ? "cloudinary"
+          : "local"
+        : env.UPLOAD_STORAGE;
     // Cross-domain cookie defaults: prod deploys frontend/backend on different
     // sites, so cookies must be SameSite=None; Secure. Dev is same-site localhost -> lax.
     const sameSite = env.COOKIE_SAMESITE ?? (isProd ? "none" : "lax");
@@ -73,6 +122,7 @@ const schema = z
       PUBLIC_BACKEND_URL:
         env.PUBLIC_BACKEND_URL ?? `http://localhost:${env.PORT}`,
       cloudinaryConfigured,
+      uploadStorage,
       googleConfigured,
       cookie: {
         sameSite,
@@ -89,7 +139,7 @@ if (!parsed.success) {
     .map((i) => `  - ${i.path.join(".") || "(root)"}: ${i.message}`)
     .join("\n");
   // eslint-disable-next-line no-console
-  console.error(`\n[env] Invalid environment configuration:\n${issues}\n`);
+  logger.error(`\n[env] Invalid environment configuration:\n${issues}\n`);
   process.exit(1);
 }
 

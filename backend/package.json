@@ -7,12 +7,16 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
+    "test": "node --test test/*.test.js",
+    "test:uploads": "node --test test/uploads.test.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "db:push": "prisma db push",
-    "seed": "node prisma/seed.js"
+    "seed": "node prisma/seed.js",
+    "seed:validate": "node prisma/seed.js --validate-only",
+    "seed:validate-target": "node prisma/seed.js --validate-target-only"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
@@ -26,7 +30,7 @@
     "cloudinary": "^2.5.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
+    "dotenv": "^16.6.1",
     "express": "^5.2.1",
     "express-rate-limit": "^7.5.0",
     "google-auth-library": "^9.15.0",
