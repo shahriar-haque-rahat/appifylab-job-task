@@ -44,6 +44,14 @@ const authSlice = createSlice({
         state.status = "authenticated";
         state.initialized = true;
       })
+      .addMatcher(
+        authApi.endpoints.googleLogin.matchFulfilled,
+        (state, action) => {
+          state.user = action.payload.user;
+          state.status = "authenticated";
+          state.initialized = true;
+        }
+      )
       .addMatcher(authApi.endpoints.register.matchFulfilled, (state, action) => {
         state.user = action.payload.user;
         state.status = "authenticated";
