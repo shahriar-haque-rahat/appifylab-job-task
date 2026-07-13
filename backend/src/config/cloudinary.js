@@ -32,30 +32,87 @@ if (env.cloudinaryConfigured) {
     secure: true,
   });
 }
+console.log({
+  cloud_name: env.CLOUDINARY_CLOUD_NAME,
+  api_key: env.CLOUDINARY_API_KEY,
+  api_secret_length: env.CLOUDINARY_API_SECRET?.length,
+  uploadStorage: env.uploadStorage,
+  cloudinaryConfigured: env.cloudinaryConfigured,
+});
 
 /**
  * Upload an in-memory image buffer to Cloudinary.
  * @param {Buffer} buffer
- * @param {{ folder?: string }} [opts]
+ * @param {{ folder?: string, timeoutMs?: number }} [opts]
  * @returns {Promise<{ url: string, publicId: string }>}
  */
 function uploadImageBuffer(buffer, opts = {}) {
   const folder = opts.folder || "appifylab/posts";
   return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      {
-        folder,
-        resource_type: "image",
-        // Cloudinary re-encodes/strips metadata; also cap dimensions to keep
-        // stored assets sane. Transformation applied on delivery, not storage.
-        transformation: [{ quality: "auto", fetch_format: "auto" }],
-      },
-      (error, result) => {
-        if (error) return reject(error);
-        resolve({ url: result.secure_url, publicId: result.public_id });
+    let stream;
+    let timer;
+    let settled = false;
+
+    const finish = (error, value) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      if (error) reject(error);
+      else resolve(value);
+    };
+
+    try {
+      stream = cloudinary.uploader.upload_stream(
+        {
+          folder,
+          resource_type: "image",
+          // Store the validated original. Browser-dependent f_auto/q_auto are
+          // delivery transformations and are added to rendered URLs instead.
+        },
+        (error, result) => {
+          if (error) {
+            console.error("====== CLOUDINARY UPLOAD ERROR ======");
+            console.error(error);
+            console.error("=====================================");
+            return finish(error);
+          }
+
+          if (!result || !result.secure_url || !result.public_id) {
+            const invalidResponse = new Error(
+              "Cloud image provider returned an invalid response"
+            );
+            invalidResponse.code = "UPLOAD_INVALID_RESPONSE";
+            return finish(invalidResponse);
+          }
+
+          finish(null, {
+            url: result.secure_url,
+            publicId: result.public_id,
+          });
+        }
+      );
+
+      if (stream && typeof stream.once === "function") {
+        stream.once("error", finish);
       }
-    );
-    stream.end(buffer);
+
+      const timeoutMs = opts.timeoutMs ?? env.UPLOAD_TIMEOUT_MS;
+      timer = setTimeout(() => {
+        const timeoutError = new Error("Cloud image upload timed out");
+        timeoutError.code = "UPLOAD_TIMEOUT";
+        finish(timeoutError);
+        if (stream && typeof stream.destroy === "function") stream.destroy();
+      }, timeoutMs);
+
+      console.log("Uploading buffer:", {
+        length: buffer.length,
+        firstBytes: buffer.subarray(0, 16).toString("hex"),
+      });
+
+      stream.end(buffer);
+    } catch (error) {
+      finish(error);
+    }
   });
 }
 

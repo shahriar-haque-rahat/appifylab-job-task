@@ -29,6 +29,25 @@ const upload = multer({
   },
 });
 
+const parseSingleImage = upload.single("image");
+
+function parseImageUpload(req, res, next) {
+  parseSingleImage(req, res, (error) => {
+    if (!error) return next();
+    if (error instanceof ApiError || error instanceof multer.MulterError) {
+      return next(error);
+    }
+
+    // Multer/busboy can surface malformed multipart bodies as plain Errors.
+    // Normalize them rather than exposing an unrelated generic 500 response.
+    return next(
+      ApiError.badRequest("Invalid image upload request", {
+        code: "INVALID_UPLOAD",
+      })
+    );
+  });
+}
+
 const router = express.Router();
 
 router.post(
@@ -36,7 +55,7 @@ router.post(
   authenticate,
   csrfProtection,
   contentCreateLimiter,
-  upload.single("image"),
+  parseImageUpload,
   ctrl.uploadImage
 );
 

@@ -8,16 +8,104 @@ const {
   uploadImageBufferLocal,
 } = require("../../config/cloudinary");
 
-const uploadImage = asyncHandler(async (req, res) => {
-  if (!req.file) {
-    throw ApiError.badRequest("No image file provided", { code: "NO_FILE" });
-  }
-  // Prefer Cloudinary when configured (durable, CDN-delivered); otherwise fall
-  // back to local disk so the feature still works with zero external setup.
-  const { url } = env.cloudinaryConfigured
-    ? await uploadImageBuffer(req.file.buffer, { folder: "appifylab/posts" })
-    : await uploadImageBufferLocal(req.file.buffer, req.file.mimetype);
-  res.status(201).json({ url });
-});
+const SAFE_FAILURE_CODES = new Set([
+  "EACCES",
+  "EDQUOT",
+  "ENOSPC",
+  "ETIMEDOUT",
+  "ECONNRESET",
+  "UPLOAD_TIMEOUT",
+  "UPLOAD_INVALID_RESPONSE",
+]);
 
-module.exports = { uploadImage };
+function safeUploadDiagnostic(provider, error) {
+  const rawStatus = Number(error && (error.http_code || error.statusCode));
+  const providerStatus =
+    Number.isInteger(rawStatus) && rawStatus >= 400 && rawStatus <= 599
+      ? rawStatus
+      : undefined;
+  const rawCode = error && typeof error.code === "string" ? error.code : "";
+  const reason = SAFE_FAILURE_CODES.has(rawCode)
+    ? rawCode
+    : providerStatus
+      ? "PROVIDER_REJECTED"
+      : "UNKNOWN";
+
+  return { provider, reason, ...(providerStatus ? { providerStatus } : {}) };
+}
+
+function createUploadImageHandler(dependencies = {}) {
+  const storage = dependencies.storage ?? env.uploadStorage;
+  const cloudUpload = dependencies.cloudUpload ?? uploadImageBuffer;
+  const localUpload = dependencies.localUpload ?? uploadImageBufferLocal;
+  const logger = dependencies.logger ?? console;
+
+  return async (req, res) => {
+    if (!req.file) {
+      console.log("========== FILE ==========");
+      console.log({
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        bufferLength: req.file.buffer.length,
+      });
+      console.log("==========================");
+
+      throw ApiError.badRequest("No image file provided", { code: "NO_FILE" });
+    }
+
+    console.log({
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+      originalname: req.file.originalname,
+    });
+
+    try {
+      let url;
+
+      if (storage === "cloudinary") {
+        try {
+          ({ url } = await cloudUpload(req.file.buffer, {
+            folder: "appifylab/posts",
+          }));
+        } catch (error) {
+          logger.warn(
+            "[upload] Cloudinary upload failed. Falling back to local storage.",
+            safeUploadDiagnostic("cloudinary", error)
+          );
+
+          ({ url } = await localUpload(
+            req.file.buffer,
+            req.file.mimetype
+          ));
+        }
+      } else {
+        ({ url } = await localUpload(
+          req.file.buffer,
+          req.file.mimetype
+        ));
+      }
+
+      res.status(201).json({ url });
+
+    } catch (error) {
+      logger.error(
+        "[upload] Image persistence failed",
+        safeUploadDiagnostic(
+          storage === "cloudinary" ? "local-fallback" : "local",
+          error
+        )
+      );
+
+      throw new ApiError(
+        500,
+        "Image upload could not be completed. Please try again.",
+        { code: "UPLOAD_FAILED" }
+      );
+    }
+  };
+}
+
+const uploadImage = asyncHandler(createUploadImageHandler());
+
+module.exports = { uploadImage, createUploadImageHandler, safeUploadDiagnostic };
