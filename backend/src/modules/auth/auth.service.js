@@ -40,8 +40,21 @@ async function issueSession(userId) {
 
 async function revokeSession(jti) {
   if (!jti) return;
-  await tokenStore.del(jti);
-  await repo.revokeByJti(jti);
+
+  // Redis and Postgres are independent stores. Await both attempts so a Redis
+  // outage cannot short-circuit the durable revocation (and vice versa).
+  const results = await Promise.allSettled([
+    Promise.resolve().then(() => tokenStore.del(jti)),
+    Promise.resolve().then(() => repo.revokeByJti(jti)),
+  ]);
+  const failures = results
+    .filter((result) => result.status === "rejected")
+    .map((result) => result.reason);
+
+  if (failures.length === 1) throw failures[0];
+  if (failures.length > 1) {
+    throw new AggregateError(failures, "Could not revoke refresh token");
+  }
 }
 
 async function revokeAllSessions(userId) {

@@ -46,8 +46,13 @@ const refresh = asyncHandler(async (req, res) => {
 
 const logout = asyncHandler(async (req, res) => {
   const token = req.cookies?.[REFRESH_COOKIE];
-  await service.logout(token);
-  clearAuthCookies(res);
+  try {
+    await service.logout(token);
+  } finally {
+    // End the browser session even if one of the server-side stores is down.
+    // The service still rejects so the cleanup failure is logged/reported.
+    clearAuthCookies(res);
+  }
   res.status(204).end();
 });
 
