@@ -30,7 +30,7 @@ export function ConfirmDialog({
   const titleId = useId();
 
   return (
-    <Modal open={open} onClose={onCancel} labelledBy={titleId} widthClassName="max-w-sm">
+    <Modal open={open} onClose={onCancel} labelledBy={titleId} widthClassName="max-w-md">
       <h3 id={titleId} className="text-[17px] font-semibold">
         {title}
       </h3>
@@ -39,7 +39,7 @@ export function ConfirmDialog({
       <div className="mt-6 flex items-center justify-end gap-3">
         <button
           type="button"
-          className="cursor-pointer rounded-lg border border-line bg-transparent px-4 py-2 text-[14px] font-medium text-ink hover:bg-surface-2 disabled:opacity-60"
+          className="cursor-pointer whitespace-nowrap rounded-lg border-0 bg-transparent px-3 py-2 text-[13px] font-medium text-ink hover:bg-surface-2 disabled:opacity-60"
           onClick={onCancel}
           disabled={busy}
         >
@@ -47,7 +47,7 @@ export function ConfirmDialog({
         </button>
         <button
           type="button"
-          className={`cursor-pointer rounded-lg border-0 px-4 py-2 text-[14px] font-semibold text-white disabled:opacity-60 ${
+          className={`cursor-pointer whitespace-nowrap rounded-lg border-0 px-3 py-2 text-[13px] font-semibold text-white disabled:opacity-60 ${
             destructive
               ? "bg-danger hover:bg-[#dc2626]"
               : "bg-primary hover:bg-primary-hover"
