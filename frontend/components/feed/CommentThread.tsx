@@ -15,7 +15,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { CommentComposer } from "./CommentComposer";
 import { LikeAvatarStack } from "./LikeAvatarStack";
 import { ThumbIcon, CommentIcon, EditIcon, TrashIcon } from "@/components/icons";
-import { timeAgo, fullName } from "@/lib/format";
+import { timeAgo, fullName, initials } from "@/lib/format";
 import type { Comment } from "@/lib/types";
 
 // Shared classes so every icon button in this row looks and behaves identically
@@ -97,7 +97,7 @@ export function CommentThread({
     <div className={`_comment_main flex w-full items-start gap-3 ${depth > 0 ? "ml-8 md:ml-12" : ""}`}>
       <div className="_comment_image">
         <span className="_comment_image_link">
-          <Avatar src={comment.author.avatarUrl} alt="" className="_comment_img1" />
+          <Avatar src={comment.author.avatarUrl} alt="" initials={initials(comment.author)} className="_comment_img1" />
         </span>
       </div>
       <div className="_comment_area flex-1 space-y-1">

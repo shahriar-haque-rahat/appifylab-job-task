@@ -6,6 +6,7 @@ import { useAppSelector } from "@/store/hooks";
 import { selectAuthUser } from "@/store/authSlice";
 import { Avatar } from "@/components/ui/Avatar";
 import { Spinner } from "@/components/ui/Spinner";
+import { initials } from "@/lib/format";
 import { FormError } from "@/components/ui/FormError";
 import { VisibilitySelector } from "./VisibilitySelector";
 import { PhotoIcon, SendIcon } from "@/components/icons";
@@ -102,7 +103,7 @@ export function PostComposer({ onCreated }: { onCreated?: () => void }) {
       <form onSubmit={onSubmit}>
         <div className="_feed_inner_text_area_box">
           <div className="_feed_inner_text_area_box_image">
-            <Avatar src={user?.avatarUrl} alt="" className="_txt_img" />
+            <Avatar src={user?.avatarUrl} alt="" initials={user ? initials(user) : undefined} className="_txt_img" />
           </div>
           <div className="_feed_inner_text_area_box_form flex-1">
             <textarea

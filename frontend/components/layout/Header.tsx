@@ -20,7 +20,7 @@ import {
   HelpIcon,
   LogoutIcon,
 } from "@/components/icons";
-import { fullName } from "@/lib/format";
+import { fullName, initials } from "@/lib/format";
 
 // Seeded, static notifications so the dropdown reflects the design instead of an
 // empty state. Not a real notification system (out of scope) — realistic sample
@@ -234,6 +234,7 @@ export function Header() {
             <Avatar
               src={user?.avatarUrl}
               alt={name}
+              initials={user ? initials(user) : undefined}
               className="_nav_profile_img"
             />
           </div>
@@ -255,7 +256,7 @@ export function Header() {
           <div className={`_nav_profile_dropdown _profile_dropdown${open ? " show" : ""}`}>
             <div className="_nav_profile_dropdown_info">
               <div className="_nav_profile_dropdown_image">
-                <Avatar src={user?.avatarUrl} alt={name} className="_nav_drop_img" />
+                <Avatar src={user?.avatarUrl} alt={name} initials={user ? initials(user) : undefined} className="_nav_drop_img" />
               </div>
               <div className="_nav_profile_dropdown_info_txt">
                 <h4 className="_nav_dropdown_title">{name}</h4>

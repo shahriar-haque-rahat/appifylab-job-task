@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useGetLikersQuery } from "@/store/api/likesApi";
 import { Avatar } from "@/components/ui/Avatar";
 import { ThumbIcon } from "@/components/icons";
-import { fullName } from "@/lib/format";
+import { fullName, initials } from "@/lib/format";
 import type { LikeTarget, UserSummary } from "@/lib/types";
 
 export function LikeAvatarStack({
@@ -46,6 +46,7 @@ export function LikeAvatarStack({
                 key={u.id}
                 src={u.avatarUrl}
                 alt={fullName(u)}
+                initials={initials(u)}
                 className="_reactor_avatar"
               />
             ))}
@@ -71,6 +72,7 @@ export function LikeAvatarStack({
               <Avatar
                 src={u.avatarUrl}
                 alt=""
+                initials={initials(u)}
                 className="h-6.5 w-6.5 rounded-full object-cover"
               />
               <span>{fullName(u)}</span>

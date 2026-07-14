@@ -6,6 +6,7 @@ import { useAppSelector } from "@/store/hooks";
 import { selectAuthUser } from "@/store/authSlice";
 import { Avatar } from "@/components/ui/Avatar";
 import { SendIcon } from "@/components/icons";
+import { initials } from "@/lib/format";
 
 // Reused for both top-level comments and replies (pass parentId for a reply).
 export function CommentComposer({
@@ -59,7 +60,7 @@ export function CommentComposer({
       <form className="_feed_inner_comment_box_form" onSubmit={onSubmit}>
         <div className="_feed_inner_comment_box_content">
           <div className="_feed_inner_comment_box_content_image">
-            <Avatar src={user?.avatarUrl} alt="" className="_comment_img" />
+            <Avatar src={user?.avatarUrl} alt="" initials={user ? initials(user) : undefined} className="_comment_img" />
           </div>
           <div className="_feed_inner_comment_box_content_txt flex-1">
             {replyTo ? (

@@ -22,7 +22,7 @@ import {
   GlobeIcon,
   LockIcon,
 } from "@/components/icons";
-import { timeAgo, fullName } from "@/lib/format";
+import { timeAgo, fullName, initials } from "@/lib/format";
 import { getErrorMessage } from "@/lib/apiError";
 import { cloudinaryVariant } from "@/lib/img";
 import type { Post, Visibility } from "@/lib/types";
@@ -81,7 +81,7 @@ export function PostCard({ post }: { post: Post }) {
         <div className="_feed_inner_timeline_post_top">
           <div className="_feed_inner_timeline_post_box">
             <div className="_feed_inner_timeline_post_box_image">
-              <Avatar src={post.author.avatarUrl} alt="" className="_post_img" />
+              <Avatar src={post.author.avatarUrl} alt="" initials={initials(post.author)} className="_post_img" />
             </div>
             <div className="_feed_inner_timeline_post_box_txt">
               <h4 className="_feed_inner_timeline_post_box_title">
