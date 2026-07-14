@@ -13,6 +13,12 @@ reply, and see who liked** any post, comment, or reply.
 
 ---
 
+## Live Urls
+### **Frontend:** https://buddyscript-bvw9.onrender.com
+### **Backend:** https://appifylab-job-task.onrender.com
+
+---
+
 ## Table of contents
 
 1. [Features](#features) · 2. [Repo structure](#repo-structure) · 3. [Quick start (local)](#quick-start-local)
@@ -107,7 +113,7 @@ npm run dev                        # http://localhost:8000  (health: /api/health
 Cloudinary is **optional** — leave the three `CLOUDINARY_*` vars blank and image upload still works
 via a built-in **local-disk fallback** (files are written to `backend/uploads/` and served at
 `/uploads/*`). Fill the vars from a free [Cloudinary](https://cloudinary.com) account to store uploads
-in Cloudinary instead — recommended before deploying to an ephemeral host (Render/Railway), where
+in Cloudinary instead — recommended before deploying to an ephemeral host (Render), where
 local disk does not persist across restarts.
 
 `UPLOAD_STORAGE=auto` selects Cloudinary only when all three credentials are present. Set it to
@@ -160,7 +166,7 @@ through the exact same `authenticate` middleware and protected routes — there 
 system.
 
 Cookie defaults are environment-aware: **dev** uses `SameSite=Lax; Secure=false` (same-site
-`localhost`); **prod** uses `SameSite=None; Secure=true` so the Vercel↔Render cross-domain cookie
+`localhost`); **prod** uses `SameSite=None; Secure=true` so the Render↔Render cross-domain cookie
 flow works. Never commit real secrets.
 
 ---
@@ -354,11 +360,11 @@ existing element was restyled:
 
 ## Deployment
 
-Free-tier friendly: **Frontend → Vercel**, **Backend → Render/Railway**, **DB → Neon**,
-**Redis → Upstash**, **Images → Cloudinary**.
+Free-tier friendly: **Frontend → Render**, **Backend → Render/Railway**, **DB → Neon**,
+**Redis → Upstash**, **Images → Cloudinary/File System**.
 
 - Backend: set all `backend/.env.example` vars; `DATABASE_URL` = Neon **pooled**, `DATABASE_URL` = Neon
-  **direct**; `CORS_ORIGIN` = your Vercel URL; `TRUST_PROXY=1`; leave cookie SameSite/Secure blank
+  **direct**; `CORS_ORIGIN` = your Render URL; `TRUST_PROXY=1`; leave cookie SameSite/Secure blank
   (prod defaults to `None`/`Secure`). Build/start: `npm ci && npm run prisma:deploy && npm start`
   (run `npm run seed` once if you want demo data).
 - Frontend: set `NEXT_PUBLIC_API_URL=https://<backend>/api`; deploy.
