@@ -98,10 +98,10 @@ docker compose up -d          # Postgres :5432, Redis :6379
 cd backend
 cp .env.example .env          # then edit if needed (defaults match docker-compose)
 npm install
-npm run prisma:generate
-npm run prisma:deploy         # apply migrations (or: npm run prisma:migrate for dev)
-npm run seed                  # demo users, posts, comments, replies, likes
-npm run dev                   # http://localhost:8000  (health: /api/health)
+npx prisma generate
+npx prisma migrate dev --name init # apply migrations (or: npm run prisma:migrate for dev)
+npx tsx prisma/seed.js             # demo users, posts, comments, replies, likes
+npm run dev                        # http://localhost:8000  (health: /api/health)
 ```
 
 Cloudinary is **optional** — leave the three `CLOUDINARY_*` vars blank and image upload still works
@@ -387,10 +387,3 @@ Free-tier friendly: **Frontend → Vercel**, **Backend → Render/Railway**, **D
   self-healing on the next rotation/TTL.
 - **Register enumeration:** registration intentionally returns a clear "email already registered"
   message (UX) rather than hiding it — login is fully hardened against enumeration.
-
----
-
-## Deliverables checklist
-
-- ✅ Source (this repo) · ✅ `README.md` + `.env.example` for both apps · ✅ Prisma seed script
-- ⬜ Video walkthrough (unlisted YouTube) · ⬜ Live URL — add links here once deployed
